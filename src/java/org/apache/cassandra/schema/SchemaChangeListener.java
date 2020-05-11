@@ -17,86 +17,81 @@
  */
 package org.apache.cassandra.schema;
 
-import java.util.List;
+import org.apache.cassandra.cql3.functions.UDAggregate;
+import org.apache.cassandra.cql3.functions.UDFunction;
+import org.apache.cassandra.db.marshal.UserType;
 
-import org.apache.cassandra.db.marshal.AbstractType;
-
-public abstract class SchemaChangeListener
+public interface SchemaChangeListener
 {
-    public void onCreateKeyspace(String keyspace)
+    default void onCreateKeyspace(KeyspaceMetadata keyspace)
     {
     }
 
-    public void onCreateTable(String keyspace, String table)
+    default void onCreateTable(TableMetadata table)
     {
     }
 
-    public void onCreateView(String keyspace, String view)
-    {
-        onCreateTable(keyspace, view);
-    }
-
-    public void onCreateType(String keyspace, String type)
+    default void onCreateView(ViewMetadata view)
     {
     }
 
-    public void onCreateFunction(String keyspace, String function, List<AbstractType<?>> argumentTypes)
+    default void onCreateType(UserType type)
     {
     }
 
-    public void onCreateAggregate(String keyspace, String aggregate, List<AbstractType<?>> argumentTypes)
+    default void onCreateFunction(UDFunction function)
     {
     }
 
-    public void onAlterKeyspace(String keyspace)
+    default void onCreateAggregate(UDAggregate aggregate)
     {
     }
 
-    // the boolean flag indicates whether the change that triggered this event may have a substantive
-    // impact on statements using the column family.
-    public void onAlterTable(String keyspace, String table, boolean affectsStatements)
+    default void onAlterKeyspace(KeyspaceMetadata before, KeyspaceMetadata after)
     {
     }
 
-    public void onAlterView(String keyspace, String view, boolean affectsStataments)
-    {
-        onAlterTable(keyspace, view, affectsStataments);
-    }
-
-    public void onAlterType(String keyspace, String type)
+    default void onAlterTable(TableMetadata before, TableMetadata after)
     {
     }
 
-    public void onAlterFunction(String keyspace, String function, List<AbstractType<?>> argumentTypes)
+    default void onAlterView(ViewMetadata before, ViewMetadata after)
     {
     }
 
-    public void onAlterAggregate(String keyspace, String aggregate, List<AbstractType<?>> argumentTypes)
+    default void onAlterType(UserType before, UserType after)
     {
     }
 
-    public void onDropKeyspace(String keyspace)
+    default void onAlterFunction(UDFunction before, UDFunction after)
     {
     }
 
-    public void onDropTable(String keyspace, String table)
+    default void onAlterAggregate(UDAggregate before, UDAggregate after)
     {
     }
 
-    public void onDropView(String keyspace, String view)
-    {
-        onDropTable(keyspace, view);
-    }
-
-    public void onDropType(String keyspace, String type)
+    default void onDropKeyspace(KeyspaceMetadata keyspace)
     {
     }
 
-    public void onDropFunction(String keyspace, String function, List<AbstractType<?>> argumentTypes)
+    default void onDropTable(TableMetadata table)
     {
     }
 
-    public void onDropAggregate(String keyspace, String aggregate, List<AbstractType<?>> argumentTypes)
+    default void onDropView(ViewMetadata view)
+    {
+    }
+
+    default void onDropType(UserType type)
+    {
+    }
+
+    default void onDropFunction(UDFunction function)
+    {
+    }
+
+    default void onDropAggregate(UDAggregate aggregate)
     {
     }
 }
