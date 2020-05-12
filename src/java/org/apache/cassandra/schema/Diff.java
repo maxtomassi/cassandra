@@ -20,7 +20,7 @@ package org.apache.cassandra.schema;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.Iterables;
 
-public class Diff<T extends Iterable, S>
+class Diff<T extends Iterable, S>
 {
     public final T created;
     public final T dropped;
@@ -43,7 +43,7 @@ public class Diff<T extends Iterable, S>
         return Iterables.filter(altered, a -> a.kind == kind);
     }
 
-    public static final class Altered<T>
+    static class Altered<T>
     {
         public final T before;
         public final T after;

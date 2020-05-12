@@ -20,7 +20,10 @@ package org.apache.cassandra.cql3.statements.schema;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import com.google.common.collect.Iterables;
 
 import org.apache.cassandra.audit.AuditLogContext;
 import org.apache.cassandra.audit.AuditLogEntryType;
@@ -33,7 +36,7 @@ import org.apache.cassandra.cql3.functions.FunctionName;
 import org.apache.cassandra.cql3.functions.UDAggregate;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -48,28 +51,27 @@ public final class DropAggregateStatement extends AlterSchemaStatement
 {
     private final String aggregateName;
     private final List<CQL3Type.Raw> arguments;
-    private final boolean argumentsSpeficied;
+    private final boolean argumentsSpecified;
     private final boolean ifExists;
 
     public DropAggregateStatement(String keyspaceName,
                                   String aggregateName,
                                   List<CQL3Type.Raw> arguments,
-                                  boolean argumentsSpeficied,
+                                  boolean argumentsSpecified,
                                   boolean ifExists)
     {
         super(keyspaceName);
         this.aggregateName = aggregateName;
         this.arguments = arguments;
-        this.argumentsSpeficied = argumentsSpeficied;
+        this.argumentsSpecified = argumentsSpecified;
         this.ifExists = ifExists;
     }
 
     public Keyspaces apply(Keyspaces schema)
     {
-        String name =
-            argumentsSpeficied
-          ? format("%s.%s(%s)", keyspaceName, aggregateName, join(", ", transform(arguments, CQL3Type.Raw::toString)))
-          : format("%s.%s", keyspaceName, aggregateName);
+        String name = argumentsSpecified
+                      ? format("%s.%s(%s)", keyspaceName, aggregateName, join(", ", transform(arguments, CQL3Type.Raw::toString)))
+                      : format("%s.%s", keyspaceName, aggregateName);
 
         KeyspaceMetadata keyspace = schema.getNullable(keyspaceName);
         if (null == keyspace)
@@ -81,7 +83,7 @@ public final class DropAggregateStatement extends AlterSchemaStatement
         }
 
         Collection<Function> aggregates = keyspace.functions.get(new FunctionName(keyspaceName, aggregateName));
-        if (aggregates.size() > 1 && !argumentsSpeficied)
+        if (aggregates.size() > 1 && !argumentsSpecified)
         {
             throw ire("'DROP AGGREGATE %s' matches multiple function definitions; " +
                       "specify the argument types by issuing a statement like " +
@@ -98,7 +100,7 @@ public final class DropAggregateStatement extends AlterSchemaStatement
         List<AbstractType<?>> argumentTypes = prepareArgumentTypes(keyspace.types);
 
         Predicate<Function> filter = Functions.Filter.UDA;
-        if (argumentsSpeficied)
+        if (argumentsSpecified)
             filter = filter.and(f -> Functions.typesMatch(f.argTypes(), argumentTypes));
 
         Function aggregate = aggregates.stream().filter(filter).findAny().orElse(null);
@@ -115,9 +117,35 @@ public final class DropAggregateStatement extends AlterSchemaStatement
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
-        Functions dropped = diff.altered.get(0).udas.dropped;
-        assert dropped.size() == 1;
-        return SchemaChange.forAggregate(Change.DROPPED, (UDAggregate) dropped.iterator().next());
+        return SchemaChange.forAggregate(Change.DROPPED, (UDAggregate) dropped(diff));
+    }
+
+    private Function dropped(KeyspacesDiff diff)
+    {
+        KeyspaceMetadata keyspaceBefore = diff.keyspace(TransformationSide.BEFORE, keyspaceName);
+        if (argumentsSpecified)
+        {
+            List<AbstractType<?>> argTypes = argumentsTypes(keyspaceBefore);
+            return find(keyspaceBefore, argTypes);
+        }
+        else
+        {
+            Collection<Function> functions = keyspaceBefore.functions.get(new FunctionName(keyspaceName, aggregateName));
+            // There should be only one, or the apply would have failed somewhere
+            return Iterables.getOnlyElement(functions);
+        }
+    }
+
+    private List<AbstractType<?>> argumentsTypes(KeyspaceMetadata keyspace)
+    {
+        return arguments.stream()
+                        .map(t -> t.prepare(keyspaceName, keyspace.types).getType())
+                        .collect(Collectors.toList());
+    }
+
+    private Function find(KeyspaceMetadata keyspace, List<AbstractType<?>> argumentTypes)
+    {
+        return keyspace.functions.find(new FunctionName(keyspaceName, aggregateName), argumentTypes).orElse(null);
     }
 
     public void authorize(ClientState client)
@@ -127,7 +155,7 @@ public final class DropAggregateStatement extends AlterSchemaStatement
             return;
 
         Stream<Function> functions = keyspace.functions.get(new FunctionName(keyspaceName, aggregateName)).stream();
-        if (argumentsSpeficied)
+        if (argumentsSpecified)
             functions = functions.filter(f -> Functions.typesMatch(f.argTypes(), prepareArgumentTypes(keyspace.types)));
 
         functions.forEach(f -> client.ensurePermission(Permission.DROP, FunctionResource.function(f)));

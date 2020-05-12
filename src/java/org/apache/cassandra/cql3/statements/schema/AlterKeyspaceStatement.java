@@ -39,9 +39,9 @@ import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.LocalStrategy;
 import org.apache.cassandra.locator.ReplicationFactor;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.KeyspaceMetadata.KeyspaceDiff;
 import org.apache.cassandra.schema.Keyspaces;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
+import org.apache.cassandra.schema.TransformationSide;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -97,10 +97,11 @@ public final class AlterKeyspaceStatement extends AlterSchemaStatement
         if (diff.isEmpty())
             return ImmutableSet.of();
 
-        KeyspaceDiff keyspaceDiff = diff.altered.get(0);
+        KeyspaceMetadata keyspaceBefore = diff.keyspace(TransformationSide.BEFORE, keyspaceName);
+        KeyspaceMetadata keyspaceAfter = diff.keyspace(TransformationSide.AFTER, keyspaceName);
 
-        AbstractReplicationStrategy before = keyspaceDiff.before.createReplicationStrategy();
-        AbstractReplicationStrategy after = keyspaceDiff.after.createReplicationStrategy();
+        AbstractReplicationStrategy before = keyspaceBefore.createReplicationStrategy();
+        AbstractReplicationStrategy after = keyspaceAfter.createReplicationStrategy();
 
         return before.getReplicationFactor().fullReplicas < after.getReplicationFactor().fullReplicas
              ? ImmutableSet.of("When increasing replication factor you need to run a full (-full) repair to distribute the data.")
