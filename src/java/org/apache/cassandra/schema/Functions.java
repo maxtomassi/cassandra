@@ -315,7 +315,7 @@ public final class Functions implements Iterable<Function>
         return (FunctionsDiff<UDAggregate>) FunctionsDiff.diff(before, after, Filter.UDA);
     }
 
-    public static final class FunctionsDiff<T extends Function> extends Diff<Functions, T>
+    static final class FunctionsDiff<T extends Function> extends Diff<Functions, T>
     {
         static final FunctionsDiff NONE = new FunctionsDiff<>(Functions.none(), Functions.none(), ImmutableList.of());
 

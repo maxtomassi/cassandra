@@ -20,7 +20,10 @@ package org.apache.cassandra.cql3.statements.schema;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import com.google.common.collect.Iterables;
 
 import org.apache.cassandra.audit.AuditLogContext;
 import org.apache.cassandra.audit.AuditLogEntryType;
@@ -31,7 +34,6 @@ import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.functions.*;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -47,28 +49,27 @@ public final class DropFunctionStatement extends AlterSchemaStatement
 {
     private final String functionName;
     private final Collection<CQL3Type.Raw> arguments;
-    private final boolean argumentsSpeficied;
+    private final boolean argumentsSpecified;
     private final boolean ifExists;
 
     public DropFunctionStatement(String keyspaceName,
                                  String functionName,
                                  Collection<CQL3Type.Raw> arguments,
-                                 boolean argumentsSpeficied,
+                                 boolean argumentsSpecified,
                                  boolean ifExists)
     {
         super(keyspaceName);
         this.functionName = functionName;
         this.arguments = arguments;
-        this.argumentsSpeficied = argumentsSpeficied;
+        this.argumentsSpecified = argumentsSpecified;
         this.ifExists = ifExists;
     }
 
     public Keyspaces apply(Keyspaces schema)
     {
-        String name =
-            argumentsSpeficied
-          ? format("%s.%s(%s)", keyspaceName, functionName, join(", ", transform(arguments, CQL3Type.Raw::toString)))
-          : format("%s.%s", keyspaceName, functionName);
+        String name = argumentsSpecified
+                      ? format("%s.%s(%s)", keyspaceName, functionName, join(", ", transform(arguments, CQL3Type.Raw::toString)))
+                      : format("%s.%s", keyspaceName, functionName);
 
         KeyspaceMetadata keyspace = schema.getNullable(keyspaceName);
         if (null == keyspace)
@@ -80,7 +81,7 @@ public final class DropFunctionStatement extends AlterSchemaStatement
         }
 
         Collection<Function> functions = keyspace.functions.get(new FunctionName(keyspaceName, functionName));
-        if (functions.size() > 1 && !argumentsSpeficied)
+        if (functions.size() > 1 && !argumentsSpecified)
         {
             throw ire("'DROP FUNCTION %s' matches multiple function definitions; " +
                       "specify the argument types by issuing a statement like " +
@@ -97,7 +98,7 @@ public final class DropFunctionStatement extends AlterSchemaStatement
         List<AbstractType<?>> argumentTypes = prepareArgumentTypes(keyspace.types);
 
         Predicate<Function> filter = Functions.Filter.UDF;
-        if (argumentsSpeficied)
+        if (argumentsSpecified)
             filter = filter.and(f -> Functions.typesMatch(f.argTypes(), argumentTypes));
 
         Function function = functions.stream().filter(filter).findAny().orElse(null);
@@ -123,9 +124,35 @@ public final class DropFunctionStatement extends AlterSchemaStatement
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
-        Functions dropped = diff.altered.get(0).udfs.dropped;
-        assert dropped.size() == 1;
-        return SchemaChange.forFunction(Change.DROPPED, (UDFunction) dropped.iterator().next());
+        return SchemaChange.forFunction(Change.DROPPED, (UDFunction) dropped(diff));
+    }
+
+    private Function dropped(KeyspacesDiff diff)
+    {
+        KeyspaceMetadata keyspaceBefore = diff.keyspace(TransformationSide.BEFORE, keyspaceName);
+        if (argumentsSpecified)
+        {
+            List<AbstractType<?>> argTypes = argumentsTypes(keyspaceBefore);
+            return find(keyspaceBefore, argTypes);
+        }
+        else
+        {
+            Collection<Function> functions = keyspaceBefore.functions.get(new FunctionName(keyspaceName, functionName));
+            // There should be only one, or the apply would have failed somewhere
+            return Iterables.getOnlyElement(functions);
+        }
+    }
+
+    private List<AbstractType<?>> argumentsTypes(KeyspaceMetadata keyspace)
+    {
+        return arguments.stream()
+                        .map(t -> t.prepare(keyspaceName, keyspace.types).getType())
+                        .collect(Collectors.toList());
+    }
+
+    private Function find(KeyspaceMetadata keyspace, List<AbstractType<?>> argumentTypes)
+    {
+        return keyspace.functions.find(new FunctionName(keyspaceName, functionName), argumentTypes).orElse(null);
     }
 
     public void authorize(ClientState client)
@@ -135,7 +162,7 @@ public final class DropFunctionStatement extends AlterSchemaStatement
             return;
 
         Stream<Function> functions = keyspace.functions.get(new FunctionName(keyspaceName, functionName)).stream();
-        if (argumentsSpeficied)
+        if (argumentsSpecified)
             functions = functions.filter(f -> Functions.typesMatch(f.argTypes(), prepareArgumentTypes(keyspace.types)));
 
         functions.forEach(f -> client.ensurePermission(Permission.DROP, FunctionResource.function(f)));

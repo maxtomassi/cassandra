@@ -20,6 +20,7 @@ package org.apache.cassandra.cql3.statements.schema;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableSet;
@@ -33,11 +34,11 @@ import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.functions.*;
 import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.schema.Functions.FunctionsDiff;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Keyspaces;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TransformationSide;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
@@ -222,17 +223,33 @@ public final class CreateAggregateStatement extends AlterSchemaStatement
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
-        assert diff.altered.size() == 1;
-        FunctionsDiff<UDAggregate> udasDiff = diff.altered.get(0).udas;
-
-        assert udasDiff.created.size() + udasDiff.altered.size() == 1;
-        boolean created = !udasDiff.created.isEmpty();
-
-        return new SchemaChange(created ? Change.CREATED : Change.UPDATED,
+        return new SchemaChange(wasCreated(diff) ? Change.CREATED : Change.UPDATED,
                                 Target.AGGREGATE,
                                 keyspaceName,
                                 aggregateName,
                                 rawArgumentTypes.stream().map(CQL3Type.Raw::toString).collect(toList()));
+    }
+
+
+    private boolean wasCreated(KeyspacesDiff diff)
+    {
+        KeyspaceMetadata keyspaceBefore = diff.keyspace(TransformationSide.BEFORE, keyspaceName);
+        List<AbstractType<?>> argTypes = argumentsTypes(keyspaceBefore);
+        Function before = find(keyspaceBefore, argTypes);
+        Function after = find(diff.keyspace(TransformationSide.AFTER, keyspaceName), argTypes);
+        return before == null && after != null;
+    }
+
+    private List<AbstractType<?>> argumentsTypes(KeyspaceMetadata keyspace)
+    {
+        return rawArgumentTypes.stream()
+                               .map(t -> t.prepare(keyspaceName, keyspace.types).getType())
+                               .collect(Collectors.toList());
+    }
+
+    private Function find(KeyspaceMetadata keyspace, List<AbstractType<?>> argumentTypes)
+    {
+        return keyspace.functions.find(new FunctionName(keyspaceName, aggregateName), argumentTypes).orElse(null);
     }
 
     public void authorize(ClientState client)
@@ -255,14 +272,9 @@ public final class CreateAggregateStatement extends AlterSchemaStatement
     @Override
     Set<IResource> createdResources(KeyspacesDiff diff)
     {
-        assert diff.altered.size() == 1;
-        FunctionsDiff<UDAggregate> udasDiff = diff.altered.get(0).udas;
-
-        assert udasDiff.created.size() + udasDiff.altered.size() == 1;
-
-        return udasDiff.created.isEmpty()
-             ? ImmutableSet.of()
-             : ImmutableSet.of(FunctionResource.functionFromCql(keyspaceName, aggregateName, rawArgumentTypes));
+        return wasCreated(diff)
+               ? ImmutableSet.of(FunctionResource.functionFromCql(keyspaceName, aggregateName, rawArgumentTypes))
+               : ImmutableSet.of();
     }
 
     @Override
