@@ -20,6 +20,7 @@ package org.apache.cassandra.cql3.statements.schema;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -36,11 +37,11 @@ import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.cql3.functions.FunctionName;
 import org.apache.cassandra.cql3.functions.UDFunction;
 import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.schema.Functions.FunctionsDiff;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Keyspaces;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TransformationSide;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -156,17 +157,32 @@ public final class CreateFunctionStatement extends AlterSchemaStatement
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
-        assert diff.altered.size() == 1;
-        FunctionsDiff<UDFunction> udfsDiff = diff.altered.get(0).udfs;
-
-        assert udfsDiff.created.size() + udfsDiff.altered.size() == 1;
-        boolean created = !udfsDiff.created.isEmpty();
-
-        return new SchemaChange(created ? Change.CREATED : Change.UPDATED,
+        return new SchemaChange(wasCreated(diff) ? Change.CREATED : Change.UPDATED,
                                 Target.FUNCTION,
                                 keyspaceName,
                                 functionName,
                                 rawArgumentTypes.stream().map(CQL3Type.Raw::toString).collect(toList()));
+    }
+
+    private boolean wasCreated(KeyspacesDiff diff)
+    {
+        KeyspaceMetadata keyspaceBefore = diff.keyspace(TransformationSide.BEFORE, keyspaceName);
+        List<AbstractType<?>> argTypes = argumentsTypes(keyspaceBefore);
+        Function before = find(keyspaceBefore, argTypes);
+        Function after = find(diff.keyspace(TransformationSide.AFTER, keyspaceName), argTypes);
+        return before == null && after != null;
+    }
+
+    private List<AbstractType<?>> argumentsTypes(KeyspaceMetadata keyspace)
+    {
+        return rawArgumentTypes.stream()
+                               .map(t -> t.prepare(keyspaceName, keyspace.types).getType())
+                               .collect(Collectors.toList());
+    }
+
+    private Function find(KeyspaceMetadata keyspace, List<AbstractType<?>> argumentTypes)
+    {
+        return keyspace.functions.find(new FunctionName(keyspaceName, functionName), argumentTypes).orElse(null);
     }
 
     public void authorize(ClientState client)
@@ -182,14 +198,9 @@ public final class CreateFunctionStatement extends AlterSchemaStatement
     @Override
     Set<IResource> createdResources(KeyspacesDiff diff)
     {
-        assert diff.altered.size() == 1;
-        FunctionsDiff<UDFunction> udfsDiff = diff.altered.get(0).udfs;
-
-        assert udfsDiff.created.size() + udfsDiff.altered.size() == 1;
-
-        return udfsDiff.created.isEmpty()
-             ? ImmutableSet.of()
-             : ImmutableSet.of(FunctionResource.functionFromCql(keyspaceName, functionName, rawArgumentTypes));
+        return wasCreated(diff)
+               ? ImmutableSet.of(FunctionResource.functionFromCql(keyspaceName, functionName, rawArgumentTypes))
+               : ImmutableSet.of();
     }
 
     @Override

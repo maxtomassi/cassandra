@@ -250,7 +250,7 @@ public final class Tables implements Iterable<TableMetadata>
         return TablesDiff.diff(before, after);
     }
 
-    public static final class TablesDiff extends Diff<Tables, TableMetadata>
+    static final class TablesDiff extends Diff<Tables, TableMetadata>
     {
         private final static TablesDiff NONE = new TablesDiff(Tables.none(), Tables.none(), ImmutableList.of());
 

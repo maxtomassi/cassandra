@@ -41,8 +41,6 @@ import org.apache.cassandra.gms.ApplicationState;
 import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.locator.LocalStrategy;
-import org.apache.cassandra.schema.KeyspaceMetadata.KeyspaceDiff;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.Pair;
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
@@ -569,7 +567,7 @@ public final class Schema
     {
         Keyspaces before = keyspaces.filter(k -> !SchemaConstants.isLocalSystemKeyspace(k.name));
         Keyspaces after = SchemaKeyspace.fetchNonSystemKeyspaces();
-        merge(Keyspaces.diff(before, after));
+        merge(KeyspacesDiff.diff(before, after));
         updateVersionAndAnnounce();
     }
 
@@ -594,7 +592,7 @@ public final class Schema
         {
             Keyspaces before = keyspaces;
             Keyspaces after = transformation.apply(before);
-            diff = Keyspaces.diff(before, after);
+            diff = KeyspacesDiff.diff(before, after);
         }
         catch (RuntimeException e)
         {
@@ -655,7 +653,7 @@ public final class Schema
         // apply the schema mutations and fetch the new versions of the altered keyspaces
         Keyspaces after = SchemaKeyspace.fetchKeyspaces(affectedKeyspaces);
 
-        merge(Keyspaces.diff(before, after));
+        merge(KeyspacesDiff.diff(before, after));
     }
 
     private void merge(KeyspacesDiff diff)
@@ -665,7 +663,7 @@ public final class Schema
         diff.altered.forEach(this::alterKeyspace);
     }
 
-    private void alterKeyspace(KeyspaceDiff delta)
+    private void alterKeyspace(KeyspaceMetadata.Diff delta)
     {
         SchemaDiagnostics.keyspaceAltering(this, delta);
 
