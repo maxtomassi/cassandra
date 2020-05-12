@@ -44,16 +44,42 @@ abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformatio
         this.keyspaceName = keyspaceName;
     }
 
+    /**
+     * Helper method that retrieves the metadata of the keyspace for this statement and directly throws if it doesn't
+     * exist. This thus never return {@code null}.
+     */
+    protected KeyspaceMetadata getExistingKeyspaceMetadata(Keyspaces schema)
+    {
+        return getKeyspaceMetadata(schema, true);
+    }
+
+    /**
+     * Helper method that retrieves the metadata of the keyspace for this statement, and optionally throws if it doesn't
+     * exist and asked to do so. If {@code throwIfNotExists} is {@code true}, this will never return {@code null}, but
+     * can otherwise.
+     */
+    protected KeyspaceMetadata getKeyspaceMetadata(Keyspaces schema, boolean throwIfNotExists)
+    {
+        KeyspaceMetadata metadata = schema.getNullable(keyspaceName);
+        if (metadata == null && throwIfNotExists)
+            throw ire("Keyspace '%s' doesn't exist", keyspaceName);
+
+        return metadata;
+    }
+
+    @Override
     public final void validate(ClientState state)
     {
         // no-op; validation is performed while executing the statement, in apply()
     }
 
+    @Override
     public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime)
     {
         return execute(state, false);
     }
 
+    @Override
     public ResultMessage executeLocally(QueryState state, QueryOptions options)
     {
         return execute(state, true);
