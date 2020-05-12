@@ -17,167 +17,66 @@
  */
 package org.apache.cassandra.cql3.statements.schema;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import com.google.common.collect.Iterables;
-
-import org.apache.cassandra.audit.AuditLogContext;
 import org.apache.cassandra.audit.AuditLogEntryType;
-import org.apache.cassandra.auth.FunctionResource;
-import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.CQL3Type;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.cql3.functions.FunctionName;
 import org.apache.cassandra.cql3.functions.UDAggregate;
-import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.schema.*;
+import org.apache.cassandra.schema.Functions;
+import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
 
-import static java.lang.String.format;
-import static java.lang.String.join;
-import static java.util.stream.Collectors.toList;
-
-import static com.google.common.collect.Iterables.transform;
-
-public final class DropAggregateStatement extends AlterSchemaStatement
+public final class DropAggregateStatement extends AbstractDropFunctionStatement
 {
-    private final String aggregateName;
-    private final List<CQL3Type.Raw> arguments;
-    private final boolean argumentsSpecified;
-    private final boolean ifExists;
-
     public DropAggregateStatement(String keyspaceName,
                                   String aggregateName,
                                   List<CQL3Type.Raw> arguments,
                                   boolean argumentsSpecified,
                                   boolean ifExists)
     {
-        super(keyspaceName);
-        this.aggregateName = aggregateName;
-        this.arguments = arguments;
-        this.argumentsSpecified = argumentsSpecified;
-        this.ifExists = ifExists;
+        super(keyspaceName, aggregateName, arguments, argumentsSpecified, ifExists);
     }
 
-    public Keyspaces apply(Keyspaces schema)
+    @Override
+    protected String functionTypeName()
     {
-        String name = argumentsSpecified
-                      ? format("%s.%s(%s)", keyspaceName, aggregateName, join(", ", transform(arguments, CQL3Type.Raw::toString)))
-                      : format("%s.%s", keyspaceName, aggregateName);
-
-        KeyspaceMetadata keyspace = schema.getNullable(keyspaceName);
-        if (null == keyspace)
-        {
-            if (ifExists)
-                return schema;
-
-            throw ire("Aggregate '%s' doesn't exist", name);
-        }
-
-        Collection<Function> aggregates = keyspace.functions.get(new FunctionName(keyspaceName, aggregateName));
-        if (aggregates.size() > 1 && !argumentsSpecified)
-        {
-            throw ire("'DROP AGGREGATE %s' matches multiple function definitions; " +
-                      "specify the argument types by issuing a statement like " +
-                      "'DROP AGGREGATE %s (type, type, ...)'. You can use cqlsh " +
-                      "'DESCRIBE AGGREGATE %s' command to find all overloads",
-                      aggregateName, aggregateName, aggregateName);
-        }
-
-        arguments.stream()
-                 .filter(CQL3Type.Raw::isFrozen)
-                 .findFirst()
-                 .ifPresent(t -> { throw ire("Argument '%s' cannot be frozen; remove frozen<> modifier from '%s'", t, t); });
-
-        List<AbstractType<?>> argumentTypes = prepareArgumentTypes(keyspace.types);
-
-        Predicate<Function> filter = Functions.Filter.UDA;
-        if (argumentsSpecified)
-            filter = filter.and(f -> Functions.typesMatch(f.argTypes(), argumentTypes));
-
-        Function aggregate = aggregates.stream().filter(filter).findAny().orElse(null);
-        if (null == aggregate)
-        {
-            if (ifExists)
-                return schema;
-
-            throw ire("Aggregate '%s' doesn't exist", name);
-        }
-
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.functions.without(aggregate)));
+        return "AGGREGATE";
     }
 
+    @Override
+    protected Predicate<Function> functionTypeFilter()
+    {
+        return Functions.Filter.UDA;
+    }
+
+    @Override
+    protected void checkDropValid(KeyspaceMetadata keyspace, Function toDrop)
+    {
+        // Nothing specific to check
+    }
+
+    @Override
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
         return SchemaChange.forAggregate(Change.DROPPED, (UDAggregate) dropped(diff));
     }
 
-    private Function dropped(KeyspacesDiff diff)
-    {
-        KeyspaceMetadata keyspaceBefore = diff.keyspace(TransformationSide.BEFORE, keyspaceName);
-        if (argumentsSpecified)
-        {
-            List<AbstractType<?>> argTypes = argumentsTypes(keyspaceBefore);
-            return find(keyspaceBefore, argTypes);
-        }
-        else
-        {
-            Collection<Function> functions = keyspaceBefore.functions.get(new FunctionName(keyspaceName, aggregateName));
-            // There should be only one, or the apply would have failed somewhere
-            return Iterables.getOnlyElement(functions);
-        }
-    }
-
-    private List<AbstractType<?>> argumentsTypes(KeyspaceMetadata keyspace)
-    {
-        return arguments.stream()
-                        .map(t -> t.prepare(keyspaceName, keyspace.types).getType())
-                        .collect(Collectors.toList());
-    }
-
-    private Function find(KeyspaceMetadata keyspace, List<AbstractType<?>> argumentTypes)
-    {
-        return keyspace.functions.find(new FunctionName(keyspaceName, aggregateName), argumentTypes).orElse(null);
-    }
-
-    public void authorize(ClientState client)
-    {
-        KeyspaceMetadata keyspace = Schema.instance.getKeyspaceMetadata(keyspaceName);
-        if (null == keyspace)
-            return;
-
-        Stream<Function> functions = keyspace.functions.get(new FunctionName(keyspaceName, aggregateName)).stream();
-        if (argumentsSpecified)
-            functions = functions.filter(f -> Functions.typesMatch(f.argTypes(), prepareArgumentTypes(keyspace.types)));
-
-        functions.forEach(f -> client.ensurePermission(Permission.DROP, FunctionResource.function(f)));
-    }
-
     @Override
-    public AuditLogContext getAuditLogContext()
+    protected AuditLogEntryType getAuditLogEntryType()
     {
-        return new AuditLogContext(AuditLogEntryType.DROP_AGGREGATE, keyspaceName, aggregateName);
+        return AuditLogEntryType.DROP_AGGREGATE;
     }
 
     public String toString()
     {
-        return String.format("%s (%s, %s)", getClass().getSimpleName(), keyspaceName, aggregateName);
-    }
-
-    private List<AbstractType<?>> prepareArgumentTypes(Types types)
-    {
-        return arguments.stream()
-                        .map(t -> t.prepare(keyspaceName, types))
-                        .map(CQL3Type::getType)
-                        .collect(toList());
+        return String.format("%s (%s, %s)", getClass().getSimpleName(), keyspaceName, functionName.name);
     }
 
     public static final class Raw extends CQLStatement.Raw
