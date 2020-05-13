@@ -35,6 +35,7 @@ import com.datastax.driver.core.Row;
 import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.EncryptionOptions.ServerEncryptionOptions.InternodeEncryption;
 import org.apache.cassandra.cql3.CQLTester;
+import org.apache.cassandra.schema.Schema;
 
 public class SettingsTableTest extends CQLTester
 {
@@ -54,7 +55,7 @@ public class SettingsTableTest extends CQLTester
     {
         config = new Config();
         table = new SettingsTable(KS_NAME, config);
-        VirtualKeyspaceRegistry.instance.register(new VirtualKeyspace(KS_NAME, ImmutableList.of(table)));
+        Schema.instance.localKeyspaces().load(new VirtualKeyspace(KS_NAME, ImmutableList.of(table)));
     }
 
     private String getValue(Field f)

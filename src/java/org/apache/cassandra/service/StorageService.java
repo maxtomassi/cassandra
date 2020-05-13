@@ -73,7 +73,6 @@ import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.compaction.Verifier;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token.TokenFactory;
@@ -1890,7 +1889,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     private List<TokenRange> describeRing(String keyspace, boolean includeOnlyLocalDC, boolean withPort) throws InvalidRequestException
     {
-        if (!Schema.instance.getKeyspaces().contains(keyspace))
+        if (!Schema.instance.getAllKeyspaces().contains(keyspace))
             throw new InvalidRequestException("No such keyspace: " + keyspace);
 
         if (keyspace == null || Keyspace.open(keyspace).getReplicationStrategy() instanceof LocalStrategy)
@@ -3581,10 +3580,10 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     private void verifyKeyspaceIsValid(String keyspaceName)
     {
-        if (null != VirtualKeyspaceRegistry.instance.getKeyspaceNullable(keyspaceName))
+        if (Schema.instance.localKeyspaces().isVirtualKeyspace(keyspaceName))
             throw new IllegalArgumentException("Cannot perform any operations against virtual keyspace " + keyspaceName);
 
-        if (!Schema.instance.getKeyspaces().contains(keyspaceName))
+        if (!Schema.instance.getAllKeyspaces().contains(keyspaceName))
             throw new IllegalArgumentException("Keyspace " + keyspaceName + " does not exist");
     }
 
@@ -4850,11 +4849,11 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
         else
         {
-            List<String> userKeyspaces = Schema.instance.getUserKeyspaces();
+            Set<String> userKeyspaces = Schema.instance.getUserKeyspaces();
 
             if (userKeyspaces.size() > 0)
             {
-                keyspace = userKeyspaces.get(0);
+                keyspace = Iterables.getFirst(userKeyspaces, null);
                 AbstractReplicationStrategy replicationStrategy = Schema.instance.getKeyspaceInstance(keyspace).getReplicationStrategy();
                 for (String keyspaceName : userKeyspaces)
                 {
@@ -4921,13 +4920,13 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     public List<String> getKeyspaces()
     {
-        List<String> keyspaceNamesList = new ArrayList<>(Schema.instance.getKeyspaces());
+        List<String> keyspaceNamesList = new ArrayList<>(Schema.instance.getAllKeyspaces());
         return Collections.unmodifiableList(keyspaceNamesList);
     }
 
     public List<String> getNonSystemKeyspaces()
     {
-        List<String> nonKeyspaceNamesList = new ArrayList<>(Schema.instance.getNonSystemKeyspaces());
+        List<String> nonKeyspaceNamesList = new ArrayList<>(Schema.instance.getNonLocalSystemKeyspaces());
         return Collections.unmodifiableList(nonKeyspaceNamesList);
     }
 
@@ -5028,7 +5027,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
             // point snitch references to the new instance
             DatabaseDescriptor.setEndpointSnitch(newSnitch);
-            for (String ks : Schema.instance.getKeyspaces())
+            for (String ks : Schema.instance.getAllKeyspaces())
             {
                 Keyspace.open(ks).getReplicationStrategy().snitch = newSnitch;
             }
