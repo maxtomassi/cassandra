@@ -46,9 +46,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.concurrent.ScheduledExecutors;
-import org.apache.cassandra.db.virtual.SystemViewsKeyspace;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
-import org.apache.cassandra.db.virtual.VirtualSchemaKeyspace;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.StartupClusterConnectivityChecker;
 import org.apache.cassandra.schema.TableMetadata;
@@ -251,7 +248,7 @@ public class CassandraDaemon
         SSTableHeaderFix.fixNonFrozenUDTIfUpgradeFrom30();
 
         // clean up debris in the rest of the keyspaces
-        for (String keyspaceName : Schema.instance.getKeyspaces())
+        for (String keyspaceName : Schema.instance.getAllKeyspaces())
         {
             // Skip system as we've already cleaned it
             if (keyspaceName.equals(SchemaConstants.SYSTEM_KEYSPACE_NAME))
@@ -273,7 +270,7 @@ public class CassandraDaemon
         Keyspace.setInitialized();
 
         // initialize keyspaces
-        for (String keyspaceName : Schema.instance.getKeyspaces())
+        for (String keyspaceName : Schema.instance.getAllKeyspaces())
         {
             if (logger.isDebugEnabled())
                 logger.debug("opening keyspace {}", keyspaceName);
@@ -431,8 +428,7 @@ public class CassandraDaemon
 
     public void setupVirtualKeyspaces()
     {
-        VirtualKeyspaceRegistry.instance.register(VirtualSchemaKeyspace.instance);
-        VirtualKeyspaceRegistry.instance.register(SystemViewsKeyspace.instance);
+        Schema.instance.localKeyspaces().loadVirtualSystemKeyspaces();
     }
 
     public void initializeNativeTransport()

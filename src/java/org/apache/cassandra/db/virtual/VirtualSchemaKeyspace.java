@@ -58,7 +58,7 @@ public final class VirtualSchemaKeyspace extends VirtualKeyspace
         public DataSet data()
         {
             SimpleDataSet result = new SimpleDataSet(metadata());
-            for (KeyspaceMetadata keyspace : VirtualKeyspaceRegistry.instance.virtualKeyspacesMetadata())
+            for (KeyspaceMetadata keyspace : Schema.instance.localKeyspaces().getVirtualKeyspacesMetadata())
                 result.row(keyspace.name);
             return result;
         }
@@ -86,7 +86,7 @@ public final class VirtualSchemaKeyspace extends VirtualKeyspace
         {
             SimpleDataSet result = new SimpleDataSet(metadata());
 
-            for (KeyspaceMetadata keyspace : VirtualKeyspaceRegistry.instance.virtualKeyspacesMetadata())
+            for (KeyspaceMetadata keyspace : Schema.instance.localKeyspaces().getVirtualKeyspacesMetadata())
             {
                 for (TableMetadata table : keyspace.tables)
                 {
@@ -131,7 +131,7 @@ public final class VirtualSchemaKeyspace extends VirtualKeyspace
         {
             SimpleDataSet result = new SimpleDataSet(metadata());
 
-            for (KeyspaceMetadata keyspace : VirtualKeyspaceRegistry.instance.virtualKeyspacesMetadata())
+            for (KeyspaceMetadata keyspace : Schema.instance.localKeyspaces().getVirtualKeyspacesMetadata())
             {
                 for (TableMetadata table : keyspace.tables)
                 {

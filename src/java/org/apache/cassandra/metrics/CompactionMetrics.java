@@ -72,7 +72,7 @@ public class CompactionMetrics
             {
                 int n = 0;
                 // add estimate number of compactions need to be done
-                for (String keyspaceName : Schema.instance.getKeyspaces())
+                for (String keyspaceName : Schema.instance.getAllKeyspaces())
                 {
                     for (ColumnFamilyStore cfs : Keyspace.open(keyspaceName).getColumnFamilyStores())
                         n += cfs.getCompactionStrategyManager().getEstimatedRemainingTasks();
@@ -90,7 +90,7 @@ public class CompactionMetrics
             {
                 Map<String, Map<String, Integer>> resultMap = new HashMap<>();
                 // estimation of compactions need to be done
-                for (String keyspaceName : Schema.instance.getKeyspaces())
+                for (String keyspaceName : Schema.instance.getAllKeyspaces())
                 {
                     for (ColumnFamilyStore cfs : Keyspace.open(keyspaceName).getColumnFamilyStores())
                     {

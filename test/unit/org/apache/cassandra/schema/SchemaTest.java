@@ -45,7 +45,7 @@ public class SchemaTest
     {
         SchemaLoader.cleanupAndLeaveDirs();
         Schema.instance.loadFromDisk();
-        assertEquals(0, Schema.instance.getNonSystemKeyspaces().size());
+        assertEquals(0, Schema.instance.getNonLocalSystemKeyspaces().size());
 
         Gossiper.instance.start((int)(System.currentTimeMillis() / 1000));
         Keyspace.setInitialized();

@@ -19,9 +19,11 @@ package org.apache.cassandra.db.virtual;
 
 import com.google.common.collect.ImmutableList;
 
+import org.apache.cassandra.schema.SchemaConstants;
+
 public final class SystemViewsKeyspace extends VirtualKeyspace
 {
-    private static final String NAME = "system_views";
+    public static final String NAME = SchemaConstants.SYSTEM_VIEWS_KEYSPACE_NAME;
 
     public static SystemViewsKeyspace instance = new SystemViewsKeyspace();
 

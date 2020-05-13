@@ -209,7 +209,7 @@ public class DataResource implements IResource
             case ROOT:
                 return true;
             case KEYSPACE:
-                return Schema.instance.getKeyspaces().contains(keyspace);
+                return Schema.instance.getAllKeyspaces().contains(keyspace);
             case TABLE:
                 return Schema.instance.getTableMetadata(keyspace, table) != null;
         }
