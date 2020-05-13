@@ -421,9 +421,6 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
 
                 if (config.has(NATIVE_PROTOCOL))
                 {
-                    // Start up virtual table support
-                    CassandraDaemon.getInstanceForTesting().setupVirtualKeyspaces();
-
                     CassandraDaemon.getInstanceForTesting().initializeNativeTransport();
                     CassandraDaemon.getInstanceForTesting().startNativeTransport();
                     StorageService.instance.setRpcReady(true);

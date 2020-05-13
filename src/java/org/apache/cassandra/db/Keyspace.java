@@ -743,12 +743,12 @@ public class Keyspace
 
     public static Iterable<Keyspace> all()
     {
-        return Iterables.transform(Schema.instance.getKeyspaces(), keyspaceTransformer);
+        return Iterables.transform(Schema.instance.getAllKeyspaces(), keyspaceTransformer);
     }
 
     public static Iterable<Keyspace> nonSystem()
     {
-        return Iterables.transform(Schema.instance.getNonSystemKeyspaces(), keyspaceTransformer);
+        return Iterables.transform(Schema.instance.getNonLocalSystemKeyspaces(), keyspaceTransformer);
     }
 
     public static Iterable<Keyspace> nonLocalStrategy()

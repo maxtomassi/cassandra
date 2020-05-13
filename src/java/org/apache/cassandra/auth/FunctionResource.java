@@ -256,7 +256,7 @@ public class FunctionResource implements IResource
             case ROOT:
                 return true;
             case KEYSPACE:
-                return Schema.instance.getKeyspaces().contains(keyspace);
+                return Schema.instance.getAllKeyspaces().contains(keyspace);
             case FUNCTION:
                 return Schema.instance.findFunction(getFunctionName(), argTypes).isPresent();
         }

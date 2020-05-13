@@ -100,8 +100,8 @@ public final class SchemaEvent extends DiagnosticEvent
         this.viewsDiff = viewsDiff;
         this.indexesDiff = indexesDiff;
 
-        this.keyspaces = new HashSet<>(schema.getKeyspaces());
-        this.nonSystemKeyspaces = new ArrayList<>(schema.getNonSystemKeyspaces());
+        this.keyspaces = new HashSet<>(schema.getAllKeyspaces());
+        this.nonSystemKeyspaces = new ArrayList<>(schema.getNonLocalSystemKeyspaces());
         this.userKeyspaces = new ArrayList<>(schema.getUserKeyspaces());
         this.numberOfTables = schema.getNumberOfTables();
         this.version = schema.getVersion();
