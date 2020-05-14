@@ -44,7 +44,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.Version;
@@ -55,11 +54,17 @@ import io.netty.util.internal.logging.Slf4JLoggerFactory;
 import org.apache.cassandra.auth.AuthenticatedUser;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.EncryptionOptions;
+import org.apache.cassandra.cql3.functions.UDAggregate;
+import org.apache.cassandra.cql3.functions.UDFunction;
 import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.UserType;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.ResourceLimits;
+import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.SchemaChangeListener;
+import org.apache.cassandra.schema.TableMetadata;
+import org.apache.cassandra.schema.ViewMetadata;
 import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.service.*;
 import org.apache.cassandra.transport.messages.EventMessage;
@@ -579,7 +584,7 @@ public class Server implements CassandraDaemon.Server
         }
     }
 
-    private static class EventNotifier extends SchemaChangeListener implements IEndpointLifecycleSubscriber
+    private static class EventNotifier implements SchemaChangeListener, IEndpointLifecycleSubscriber
     {
         private final Server server;
 
@@ -691,85 +696,144 @@ public class Server implements CassandraDaemon.Server
             }
         }
 
-        public void onCreateKeyspace(String ksName)
+        @Override
+        public void onCreateKeyspace(KeyspaceMetadata keyspace)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED, ksName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED, keyspace.name));
         }
 
-        public void onCreateTable(String ksName, String cfName)
+        @Override
+        public void onCreateTable(TableMetadata table)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.TABLE, ksName, cfName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED,
+                                        Event.SchemaChange.Target.TABLE,
+                                        table.keyspace,
+                                        table.name));
         }
 
-        public void onCreateType(String ksName, String typeName)
+        @Override
+        public void onCreateView(ViewMetadata view)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.TYPE, ksName, typeName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED,
+                                        Event.SchemaChange.Target.TABLE,
+                                        view.keyspace(),
+                                        view.name()));
         }
 
-        public void onCreateFunction(String ksName, String functionName, List<AbstractType<?>> argTypes)
+        @Override
+        public void onCreateType(UserType type)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.FUNCTION,
-                                        ksName, functionName, AbstractType.asCQLTypeStringList(argTypes)));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED,
+                                        Event.SchemaChange.Target.TYPE,
+                                        type.keyspace,
+                                        type.getNameAsString()));
         }
 
-        public void onCreateAggregate(String ksName, String aggregateName, List<AbstractType<?>> argTypes)
+        @Override
+        public void onCreateFunction(UDFunction function)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.AGGREGATE,
-                                        ksName, aggregateName, AbstractType.asCQLTypeStringList(argTypes)));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED,
+                                        Event.SchemaChange.Target.FUNCTION,
+                                        function.name().keyspace,
+                                        function.name().name,
+                                        AbstractType.asCQLTypeStringList(function.argTypes())));
         }
 
-        public void onAlterKeyspace(String ksName)
+        @Override
+        public void onCreateAggregate(UDAggregate aggregate)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, ksName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.CREATED,
+                                        Event.SchemaChange.Target.AGGREGATE,
+                                        aggregate.name().keyspace,
+                                        aggregate.name().name,
+                                        AbstractType.asCQLTypeStringList(aggregate.argTypes())));
         }
 
-        public void onAlterTable(String ksName, String cfName, boolean affectsStatements)
+        public void onAlterKeyspace(KeyspaceMetadata before, KeyspaceMetadata after)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, Event.SchemaChange.Target.TABLE, ksName, cfName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, after.name));
         }
 
-        public void onAlterType(String ksName, String typeName)
+        @Override
+        public void onAlterTable(TableMetadata before, TableMetadata after)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, Event.SchemaChange.Target.TYPE, ksName, typeName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED,
+                                        Event.SchemaChange.Target.TABLE,
+                                        after.keyspace,
+                                        after.name));
         }
 
-        public void onAlterFunction(String ksName, String functionName, List<AbstractType<?>> argTypes)
+        @Override
+        public void onAlterType(UserType before, UserType after)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, Event.SchemaChange.Target.FUNCTION,
-                                        ksName, functionName, AbstractType.asCQLTypeStringList(argTypes)));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED,
+                                        Event.SchemaChange.Target.TYPE,
+                                        after.keyspace,
+                                        after.getNameAsString()));
         }
 
-        public void onAlterAggregate(String ksName, String aggregateName, List<AbstractType<?>> argTypes)
+        @Override
+        public void onAlterFunction(UDFunction before, UDFunction after)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED, Event.SchemaChange.Target.AGGREGATE,
-                                        ksName, aggregateName, AbstractType.asCQLTypeStringList(argTypes)));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED,
+                                        Event.SchemaChange.Target.FUNCTION,
+                                        after.name().keyspace,
+                                        after.name().name,
+                                        AbstractType.asCQLTypeStringList(after.argTypes())));
         }
 
-        public void onDropKeyspace(String ksName)
+        @Override
+        public void onAlterAggregate(UDAggregate before, UDAggregate after)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, ksName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.UPDATED,
+                                        Event.SchemaChange.Target.AGGREGATE,
+                                        after.name().keyspace,
+                                        after.name().name,
+                                        AbstractType.asCQLTypeStringList(after.argTypes())));
         }
 
-        public void onDropTable(String ksName, String cfName)
+        @Override
+        public void onDropKeyspace(KeyspaceMetadata keyspace)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.TABLE, ksName, cfName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, keyspace.name));
         }
 
-        public void onDropType(String ksName, String typeName)
+        @Override
+        public void onDropTable(TableMetadata table)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.TYPE, ksName, typeName));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED,
+                                        Event.SchemaChange.Target.TABLE,
+                                        table.keyspace,
+                                        table.name));
         }
 
-        public void onDropFunction(String ksName, String functionName, List<AbstractType<?>> argTypes)
+        @Override
+        public void onDropType(UserType type)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.FUNCTION,
-                                        ksName, functionName, AbstractType.asCQLTypeStringList(argTypes)));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED,
+                                        Event.SchemaChange.Target.TYPE,
+                                        type.keyspace,
+                                        type.getNameAsString()));
         }
 
-        public void onDropAggregate(String ksName, String aggregateName, List<AbstractType<?>> argTypes)
+        @Override
+        public void onDropFunction(UDFunction function)
         {
-            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.AGGREGATE,
-                                        ksName, aggregateName, AbstractType.asCQLTypeStringList(argTypes)));
+            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED,
+                                        Event.SchemaChange.Target.FUNCTION,
+                                        function.name().keyspace,
+                                        function.name().name,
+                                        AbstractType.asCQLTypeStringList(function.argTypes())));
+        }
+
+        @Override
+        public void onDropAggregate(UDAggregate aggregate)
+        {
+            send(new Event.SchemaChange(Event.SchemaChange.Change.DROPPED,
+                                        Event.SchemaChange.Target.AGGREGATE,
+                                        aggregate.name().keyspace,
+                                        aggregate.name().name,
+                                        AbstractType.asCQLTypeStringList(aggregate.argTypes())));
         }
     }
 }

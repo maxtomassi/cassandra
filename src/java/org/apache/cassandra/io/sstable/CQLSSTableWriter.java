@@ -502,10 +502,7 @@ public class CQLSSTableWriter implements Closeable
 
             synchronized (CQLSSTableWriter.class)
             {
-                if (Schema.instance.getKeyspaceMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME) == null)
-                    Schema.instance.load(SchemaKeyspace.metadata());
-                if (Schema.instance.getKeyspaceMetadata(SchemaConstants.SYSTEM_KEYSPACE_NAME) == null)
-                    Schema.instance.load(SystemKeyspace.metadata());
+                Schema.instance.localKeyspaces().loadLocalSystemKeyspaces();
 
                 String keyspaceName = schemaStatement.keyspace();
 
