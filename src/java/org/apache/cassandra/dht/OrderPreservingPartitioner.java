@@ -225,7 +225,7 @@ public class OrderPreservingPartitioner implements IPartitioner
             lastToken = node;
         }
 
-        for (String ks : Schema.instance.getKeyspaces())
+        for (String ks : Schema.instance.getAllKeyspaces())
         {
             for (TableMetadata cfmd : Schema.instance.getTablesAndViews(ks))
             {

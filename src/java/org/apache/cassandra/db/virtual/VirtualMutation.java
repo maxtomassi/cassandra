@@ -27,6 +27,7 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.IMutation;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
+import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.TableId;
 
 /**
@@ -55,7 +56,9 @@ public final class VirtualMutation implements IMutation
     @Override
     public void apply()
     {
-        modifications.forEach((id, update) -> VirtualKeyspaceRegistry.instance.getTableNullable(id).apply(update));
+        modifications.forEach((id, update) -> Schema.instance.localKeyspaces()
+                                                             .virtualTableInstance(update.metadata())
+                                                             .apply(update));
     }
 
     @Override

@@ -25,14 +25,16 @@ import java.util.function.Function;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.math3.util.Precision;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Counting;
 import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Metered;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.Sampling;
 import com.codahale.metrics.Snapshot;
+import com.codahale.metrics.Timer;
 import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.CompositeType;
 import org.apache.cassandra.db.marshal.DoubleType;
@@ -40,6 +42,7 @@ import org.apache.cassandra.db.marshal.LongType;
 import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.LocalPartitioner;
+import org.apache.cassandra.metrics.LatencyMetrics.LatencyMetricsTimer;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.schema.TableMetadata;
 
@@ -68,34 +71,27 @@ public class TableMetricTables
     public static Collection<VirtualTable> getAll(String name)
     {
         return ImmutableList.of(
-            new LatencyTableMetric(name, "local_read_latency", t -> t.readLatency.latency),
-            new LatencyTableMetric(name, "local_scan_latency", t -> t.rangeLatency.latency),
-            new LatencyTableMetric(name, "coordinator_read_latency", t -> t.coordinatorReadLatency),
-            new LatencyTableMetric(name, "coordinator_scan_latency", t -> t.coordinatorScanLatency),
-            new LatencyTableMetric(name, "local_write_latency", t -> t.writeLatency.latency),
-            new LatencyTableMetric(name, "coordinator_write_latency", t -> t.coordinatorWriteLatency),
-            new HistogramTableMetric(name, "tombstones_per_read", t -> t.tombstoneScannedHistogram.cf),
-            new HistogramTableMetric(name, "rows_per_read", t -> t.liveScannedHistogram.cf),
-            new StorageTableMetric(name, "disk_usage", (TableMetrics t) -> t.totalDiskSpaceUsed),
-            new StorageTableMetric(name, "max_partition_size", (TableMetrics t) -> t.maxPartitionSize));
+            new LatencyTableMetric<>(name, "local_read_latency", t -> t.readLatency.latency, LatencyMetricsTimer.class),
+            new LatencyTableMetric<>(name, "local_scan_latency", t -> t.rangeLatency.latency, LatencyMetricsTimer.class),
+            new LatencyTableMetric<>(name, "coordinator_read_latency", t -> t.coordinatorReadLatency, Timer.class),
+            new LatencyTableMetric<>(name, "coordinator_scan_latency", t -> t.coordinatorScanLatency, Timer.class),
+            new LatencyTableMetric<>(name, "local_write_latency", t -> t.writeLatency.latency, LatencyMetricsTimer.class),
+            new LatencyTableMetric<>(name, "coordinator_write_latency", t -> t.coordinatorWriteLatency, Timer.class),
+            new HistogramTableMetric<>(name, "tombstones_per_read", t -> t.tombstoneScannedHistogram.cf, Histogram.class),
+            new HistogramTableMetric<>(name, "rows_per_read", t -> t.liveScannedHistogram.cf, Histogram.class),
+            new StorageTableMetric<>(name, "disk_usage", (TableMetrics t) -> t.totalDiskSpaceUsed, Counter.class),
+            new StorageTableMetric<>(name, "max_partition_size", (TableMetrics t) -> t.maxPartitionSize, Gauge.class)
+        );
     }
 
     /**
      * A table that describes a some amount of disk on space in a Counter or Gauge
      */
-    private static class StorageTableMetric extends TableMetricTable
+    private static class StorageTableMetric<M extends Metric> extends TableMetricTable<M>
     {
-        interface GaugeFunction extends Function<TableMetrics, Gauge<Long>> {}
-        interface CountingFunction<M extends Metric & Counting> extends Function<TableMetrics, M> {}
-
-        <M extends Metric & Counting> StorageTableMetric(String keyspace, String table, CountingFunction<M> func)
+        StorageTableMetric(String keyspace, String table, Function<TableMetrics, M> func, Class<M> metricClass)
         {
-            super(keyspace, table, func, "mebibytes", LongType.instance, "");
-        }
-
-        StorageTableMetric(String keyspace, String table, GaugeFunction func)
-        {
-            super(keyspace, table, func, "mebibytes", LongType.instance, "");
+            super(keyspace, table, func, metricClass, "mebibytes", LongType.instance, "");
         }
 
         /**
@@ -110,16 +106,16 @@ public class TableMetricTables
     /**
      * A table that describes a Latency metric, specifically a Timer
      */
-    private static class HistogramTableMetric extends TableMetricTable
+    private static class HistogramTableMetric<M extends Metric & Sampling> extends TableMetricTable<M>
     {
-        <M extends Metric & Sampling> HistogramTableMetric(String keyspace, String table, Function<TableMetrics, M> func)
+        HistogramTableMetric(String keyspace, String table, Function<TableMetrics, M> func, Class<M> metricClass)
         {
-            this(keyspace, table, func, "");
+            this(keyspace, table, func, metricClass, "");
         }
 
-        <M extends Metric & Sampling> HistogramTableMetric(String keyspace, String table, Function<TableMetrics, M> func, String suffix)
+        HistogramTableMetric(String keyspace, String table, Function<TableMetrics, M> func, Class<M> metricClass, String suffix)
         {
-            super(keyspace, table, func, "count", LongType.instance, suffix);
+            super(keyspace, table, func, metricClass, "count", LongType.instance, suffix);
         }
 
         /**
@@ -135,11 +131,11 @@ public class TableMetricTables
     /**
      * A table that describes a Latency metric, specifically a Timer
      */
-    private static class LatencyTableMetric extends HistogramTableMetric
+    private static class LatencyTableMetric<M extends Metric & Sampling> extends HistogramTableMetric<M>
     {
-        <M extends Metric & Sampling> LatencyTableMetric(String keyspace, String table, Function<TableMetrics, M> func)
+        LatencyTableMetric(String keyspace, String table, Function<TableMetrics, M> func, Class<M> metricClass)
         {
-            super(keyspace, table, func, "_ms");
+            super(keyspace, table, func, metricClass, "_ms");
         }
 
         /**
@@ -158,17 +154,19 @@ public class TableMetricTables
      * Abstraction over the Metrics Gauge, Counter, and Timer that will turn it into a (keyspace_name, table_name)
      * table.
      */
-    private static class TableMetricTable extends AbstractVirtualTable
+    private static class TableMetricTable<M extends Metric> extends AbstractVirtualTable
     {
-        final Function<TableMetrics, ? extends Metric> func;
+        final Function<TableMetrics, M> func;
+        final Class<M> metricClass;
         final String columnName;
         final String suffix;
 
-        TableMetricTable(String keyspace, String table, Function<TableMetrics, ? extends Metric> func,
-                                String colName, AbstractType colType, String suffix)
+        TableMetricTable(String keyspace, String table, Function<TableMetrics, M> func, Class<M> metricClass,
+                         String colName, AbstractType colType, String suffix)
         {
-            super(buildMetadata(keyspace, table, func, colName, colType, suffix));
+            super(buildMetadata(keyspace, table, metricClass, colName, colType, suffix));
             this.func = func;
+            this.metricClass = metricClass;
             this.columnName = colName;
             this.suffix = suffix;
         }
@@ -196,7 +194,7 @@ public class TableMetricTables
                 result.row(cfs.keyspace.getName(), cfs.name);
 
                 // extract information by metric type and put it in row based on implementation of `add`
-                if (metric instanceof Counting)
+                if (Counting.class.isAssignableFrom(metricClass))
                 {
                     add(result, columnName, ((Counting) metric).getCount());
                     if (metric instanceof Sampling)
@@ -224,11 +222,11 @@ public class TableMetricTables
     }
 
     /**
-     *  Identify the type of Metric it is (gauge, counter etc) abd create the TableMetadata. The column name
+     *  Identify the type of Metric it is (gauge, counter etc) and create the TableMetadata. The column name
      *  and type for a counter/gauge is formatted differently based on the units (bytes/time) so allowed to
      *  be set.
      */
-    private static TableMetadata buildMetadata(String keyspace, String table, Function<TableMetrics, ? extends Metric> func,
+    private static TableMetadata buildMetadata(String keyspace, String table, Class<? extends Metric> metricClass,
                                               String colName, AbstractType colType, String suffix)
     {
         TableMetadata.Builder metadata = TableMetadata.builder(keyspace, table)
@@ -237,26 +235,22 @@ public class TableMetricTables
                                                       .addPartitionKeyColumn(TABLE_NAME, UTF8Type.instance)
                                                       .partitioner(PARTITIONER);
 
-        // get a table from system keyspace and get metric from it for determining type of metric
-        Keyspace system = Keyspace.system().iterator().next();
-        Metric test = func.apply(system.getColumnFamilyStores().iterator().next().metric);
-
-        if (test instanceof Counting)
+        if (Counting.class.isAssignableFrom(metricClass))
         {
             metadata.addRegularColumn(colName, colType);
             // if it has a Histogram include some information about distribution
-            if (test instanceof Sampling)
+            if (Sampling.class.isAssignableFrom(metricClass))
             {
                 metadata.addRegularColumn(P50 + suffix, DoubleType.instance)
                         .addRegularColumn(P99 + suffix, DoubleType.instance)
                         .addRegularColumn(MAX + suffix, DoubleType.instance);
             }
-            if (test instanceof Metered)
+            if (Metered.class.isAssignableFrom(metricClass))
             {
                 metadata.addRegularColumn(RATE, DoubleType.instance);
             }
         }
-        else if (test instanceof Gauge)
+        else if (Gauge.class.isAssignableFrom(metricClass))
         {
             metadata.addRegularColumn(colName, colType);
         }

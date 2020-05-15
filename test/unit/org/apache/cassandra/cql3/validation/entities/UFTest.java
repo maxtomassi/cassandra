@@ -66,11 +66,11 @@ public class UFTest extends CQLTester
                                   InvalidRequestException.class,
                                   "DROP FUNCTION " + KEYSPACE + ".func_does_not_exist(int, text)");
 
-        assertInvalidThrowMessage("Function 'keyspace_does_not_exist.func_does_not_exist' doesn't exist",
+        assertInvalidThrowMessage("Keyspace 'keyspace_does_not_exist' doesn't exist",
                                   InvalidRequestException.class,
                                   "DROP FUNCTION keyspace_does_not_exist.func_does_not_exist");
 
-        assertInvalidThrowMessage("Function 'keyspace_does_not_exist.func_does_not_exist(int, text)' doesn't exist",
+        assertInvalidThrowMessage("Keyspace 'keyspace_does_not_exist' doesn't exist",
                                   InvalidRequestException.class,
                                   "DROP FUNCTION keyspace_does_not_exist.func_does_not_exist(int, text)");
 

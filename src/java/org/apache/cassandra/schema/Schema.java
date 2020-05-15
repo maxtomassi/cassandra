@@ -22,7 +22,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Sets;
 
@@ -33,7 +32,6 @@ import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.UserType;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.UnknownTableException;
@@ -41,8 +39,6 @@ import org.apache.cassandra.gms.ApplicationState;
 import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.locator.LocalStrategy;
-import org.apache.cassandra.schema.KeyspaceMetadata.KeyspaceDiff;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.Pair;
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
@@ -56,6 +52,8 @@ public final class Schema
     public static final Schema instance = new Schema();
 
     private volatile Keyspaces keyspaces = Keyspaces.none();
+
+    private final LocalKeyspaces localKeyspaces;
 
     // UUID -> mutable metadata ref map. We have to update these in place every time a table changes.
     private final Map<TableId, TableMetadataRef> metadataRefs = new NonBlockingHashMap<>();
@@ -75,11 +73,17 @@ public final class Schema
      */
     private Schema()
     {
+        this.localKeyspaces = new LocalKeyspaces(this);
+
         if (DatabaseDescriptor.isDaemonInitialized() || DatabaseDescriptor.isToolInitialized())
         {
-            load(SchemaKeyspace.metadata());
-            load(SystemKeyspace.metadata());
+            this.localKeyspaces.loadHardCodedDefinitions();
         }
+    }
+
+    public LocalKeyspaces localKeyspaces()
+    {
+        return localKeyspaces;
     }
 
     /**
@@ -122,7 +126,7 @@ public final class Schema
         keyspaces = keyspaces.withAddedOrUpdated(ksm);
     }
 
-    private void loadNew(KeyspaceMetadata ksm)
+    void loadNew(KeyspaceMetadata ksm)
     {
         ksm.tablesAndViews()
            .forEach(metadata -> metadataRefs.put(metadata.id, new TableMetadataRef(metadata)));
@@ -134,7 +138,7 @@ public final class Schema
         SchemaDiagnostics.metadataInitialized(this, ksm);
     }
 
-    private void reload(KeyspaceMetadata previous, KeyspaceMetadata updated)
+    void reload(KeyspaceMetadata previous, KeyspaceMetadata updated)
     {
         Keyspace keyspace = getKeyspaceInstance(updated.name);
         if (null != keyspace)
@@ -259,11 +263,23 @@ public final class Schema
         SchemaDiagnostics.metadataRemoved(this, ksm);
     }
 
+    /**
+     * The total number of tables defined, _including_ system ones (but excluding system views).
+     */
     public int getNumberOfTables()
     {
-        return keyspaces.stream().mapToInt(k -> size(k.tablesAndViews())).sum();
+        int numOfNonLocalTables = keyspaces.stream().mapToInt(k -> size(k.tablesAndViews())).sum();
+        return localKeyspaces.numberOfLocalSystemTables() + numOfNonLocalTables;
     }
 
+    /**
+     * Gets a materialized view metadata by name.
+     *
+     * @param keyspaceName the keyspace of the view.
+     * @param viewName the name of the view.
+     * @return the metadata for the view, or {@code null} if that view does not exists.
+     */
+    @Nullable
     public ViewMetadata getView(String keyspaceName, String viewName)
     {
         assert keyspaceName != null;
@@ -276,14 +292,19 @@ public final class Schema
      *
      * @param keyspaceName The name of the keyspace
      *
-     * @return The keyspace metadata or null if it wasn't found
+     * @return The keyspace metadata or {@code null} if it wasn't found
      */
+    @Nullable
     public KeyspaceMetadata getKeyspaceMetadata(String keyspaceName)
     {
         assert keyspaceName != null;
         KeyspaceMetadata keyspace = keyspaces.getNullable(keyspaceName);
-        return null != keyspace ? keyspace : VirtualKeyspaceRegistry.instance.getKeyspaceMetadataNullable(keyspaceName);
-    }
+
+        if (keyspace != null)
+            return keyspace;
+
+        // Check if it's a local keyspace, or a virtual one.
+        return localKeyspaces.getKeyspaceMetadata(keyspaceName);    }
 
     private Set<String> getNonSystemKeyspacesSet()
     {
@@ -291,17 +312,20 @@ public final class Schema
     }
 
     /**
+     * The names of all non-local-system keyspaces.
+     *
      * @return collection of the non-system keyspaces (note that this count as system only the
      * non replicated keyspaces, so keyspace like system_traces which are replicated are actually
      * returned. See getUserKeyspace() below if you don't want those)
      */
-    public ImmutableList<String> getNonSystemKeyspaces()
+    public Set<String> getNonLocalSystemKeyspaces()
     {
-        return ImmutableList.copyOf(getNonSystemKeyspacesSet());
+        return this.keyspaces.names();
     }
 
     /**
-     * @return a collection of keyspaces that do not use LocalStrategy for replication
+     * The names of all (non-virtual) replicated keyspaces, that is any keyspace (system distributed ones include) that
+     * do not use {@link LocalStrategy}.
      */
     public List<String> getNonLocalStrategyKeyspaces()
     {
@@ -312,34 +336,34 @@ public final class Schema
     }
 
     /**
-     * @return collection of the user defined keyspaces
+     * All user created keyspaces.
      */
-    public List<String> getUserKeyspaces()
+    public Set<String> getUserKeyspaces()
     {
-        return ImmutableList.copyOf(Sets.difference(getNonSystemKeyspacesSet(), SchemaConstants.REPLICATED_SYSTEM_KEYSPACE_NAMES));
+        return Sets.difference(getNonSystemKeyspacesSet(), SchemaConstants.REPLICATED_SYSTEM_KEYSPACE_NAMES);
     }
 
     /**
      * Get metadata about keyspace inner ColumnFamilies
      *
-     * @param keyspaceName The name of the keyspace
+     * @param keyspaceName The name of the keyspace, which must exists
      *
-     * @return metadata about ColumnFamilies the belong to the given keyspace
+     * @return metadata about all the tables and views belonging to {@code keyspaceName}
      */
     public Iterable<TableMetadata> getTablesAndViews(String keyspaceName)
     {
         assert keyspaceName != null;
-        KeyspaceMetadata ksm = keyspaces.getNullable(keyspaceName);
+        KeyspaceMetadata ksm = getKeyspaceMetadata(keyspaceName);
         assert ksm != null;
         return ksm.tablesAndViews();
     }
 
     /**
-     * @return collection of the all keyspace names registered in the system (system and non-system)
+     * All the non-virtual keyspace names registered in the system (system and non-system).
      */
-    public Set<String> getKeyspaces()
+    public Set<String> getAllKeyspaces()
     {
-        return keyspaces.names();
+        return Sets.union(keyspaces.names(), localKeyspaces.localSystemKeyspaceNames());
     }
 
     /* TableMetadata/Ref query/control methods */
@@ -392,15 +416,13 @@ public final class Schema
     }
 
     /**
-     * Given a keyspace name and table name, get the table
-     * meta data. If the keyspace name or table name is not valid
-     * this function returns null.
+     * Retrieves a table (or view, and including virtual tables) metadata by name.
      *
-     * @param keyspace The keyspace name
-     * @param table The table name
-     *
-     * @return TableMetadata object or null if it wasn't found
+     * @param keyspace the keyspace name, which must not be {@code null}.
+     * @param table the table name, which must not be {@code null}.
+     * @return the metadata for {@code keyspace.table}, or {@code null} if it doesn't exists.
      */
+    @Nullable
     public TableMetadata getTableMetadata(String keyspace, String table)
     {
         assert keyspace != null;
@@ -412,13 +434,30 @@ public final class Schema
              : ksm.getTableOrViewNullable(table);
     }
 
+    /**
+     * Retrieves a table (or view, and including virtual tables) metadata by ID.
+     *
+     * @param id the ID of the table to retriever.
+     * @return the metadata for table {@code id}, or {@code null} if it doesn't exists.
+     */
     @Nullable
     public TableMetadata getTableMetadata(TableId id)
     {
         TableMetadata table = keyspaces.getTableOrViewNullable(id);
-        return null != table ? table : VirtualKeyspaceRegistry.instance.getTableMetadataNullable(id);
+        return table == null ? localKeyspaces.getTableMetadata(id) : table;
     }
 
+    /**
+     * Validates that a table (or view, and including virtual tables) exists, returning its metadata if it does and
+     * throwing otherwise.
+     *
+     * @param keyspaceName the keyspace name, which must not be {@code null}.
+     * @param tableName the table name, which must not be {@code null}.
+     * @return the metadata for existing table {@code keyspaceName.tableName}.
+     *
+     * @throws KeyspaceNotDefinedException if {@code keyspaceName} does not exist.
+     * @throws InvalidRequestException if {@code tableName} does not exist within {@code keyspaceName}.
+     */
     public TableMetadata validateTable(String keyspaceName, String tableName)
     {
         if (tableName.isEmpty())
@@ -441,7 +480,9 @@ public final class Schema
     }
 
     /**
-     * @throws UnknownTableException if the table couldn't be found in the metadata
+     * Retrieves a table (or view, and including virtual tables) metadata by ID, throwing if such table does not exist.
+     *
+     * @throws UnknownTableException if the table couldn't be found in the metadata.
      */
     public TableMetadata getExistingTableMetadata(TableId id) throws UnknownTableException
     {
@@ -556,7 +597,7 @@ public final class Schema
      */
     public synchronized void clear()
     {
-        getNonSystemKeyspaces().forEach(k -> unload(getKeyspaceMetadata(k)));
+        getNonLocalSystemKeyspaces().forEach(k -> unload(getKeyspaceMetadata(k)));
         updateVersionAndAnnounce();
         SchemaDiagnostics.schemataCleared(this);
     }
@@ -569,7 +610,7 @@ public final class Schema
     {
         Keyspaces before = keyspaces.filter(k -> !SchemaConstants.isLocalSystemKeyspace(k.name));
         Keyspaces after = SchemaKeyspace.fetchNonSystemKeyspaces();
-        merge(Keyspaces.diff(before, after));
+        merge(KeyspacesDiff.diff(before, after));
         updateVersionAndAnnounce();
     }
 
@@ -594,7 +635,7 @@ public final class Schema
         {
             Keyspaces before = keyspaces;
             Keyspaces after = transformation.apply(before);
-            diff = Keyspaces.diff(before, after);
+            diff = KeyspacesDiff.diff(before, after);
         }
         catch (RuntimeException e)
         {
@@ -655,7 +696,7 @@ public final class Schema
         // apply the schema mutations and fetch the new versions of the altered keyspaces
         Keyspaces after = SchemaKeyspace.fetchKeyspaces(affectedKeyspaces);
 
-        merge(Keyspaces.diff(before, after));
+        merge(KeyspacesDiff.diff(before, after));
     }
 
     private void merge(KeyspacesDiff diff)
@@ -665,7 +706,7 @@ public final class Schema
         diff.altered.forEach(this::alterKeyspace);
     }
 
-    private void alterKeyspace(KeyspaceDiff delta)
+    private void alterKeyspace(KeyspaceMetadata.Diff delta)
     {
         SchemaDiagnostics.keyspaceAltering(this, delta);
 

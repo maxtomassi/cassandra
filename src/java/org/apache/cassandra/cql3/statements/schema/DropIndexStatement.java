@@ -22,10 +22,8 @@ import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QualifiedName;
-import org.apache.cassandra.schema.Diff;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.KeyspaceMetadata.KeyspaceDiff;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -65,13 +63,7 @@ public final class DropIndexStatement extends AlterSchemaStatement
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
-        assert diff.altered.size() == 1;
-        KeyspaceDiff ksDiff = diff.altered.get(0);
-
-        assert ksDiff.tables.altered.size() == 1;
-        Diff.Altered<TableMetadata> tableDiff = ksDiff.tables.altered.iterator().next();
-
-        return new SchemaChange(Change.UPDATED, Target.TABLE, keyspaceName, tableDiff.after.name);
+        return new SchemaChange(Change.UPDATED, Target.TABLE, keyspaceName, diff.alteredTable(TransformationSide.AFTER).name);
     }
 
     public void authorize(ClientState client)

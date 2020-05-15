@@ -266,33 +266,30 @@ public final class KeyspaceMetadata
                                                                      params.replication.options);
     }
 
-    static Optional<KeyspaceDiff> diff(KeyspaceMetadata before, KeyspaceMetadata after)
+    static Optional<Diff> diff(KeyspaceMetadata before, KeyspaceMetadata after)
     {
-        return KeyspaceDiff.diff(before, after);
+        return Diff.diff(before, after);
     }
 
-    public static final class KeyspaceDiff
+    static final class Diff extends org.apache.cassandra.schema.Diff.Altered<KeyspaceMetadata>
     {
-        public final KeyspaceMetadata before;
-        public final KeyspaceMetadata after;
+        final TablesDiff tables;
+        final ViewsDiff views;
+        final TypesDiff types;
 
-        public final TablesDiff tables;
-        public final ViewsDiff views;
-        public final TypesDiff types;
+        final FunctionsDiff<UDFunction> udfs;
+        final FunctionsDiff<UDAggregate> udas;
 
-        public final FunctionsDiff<UDFunction> udfs;
-        public final FunctionsDiff<UDAggregate> udas;
-
-        private KeyspaceDiff(KeyspaceMetadata before,
+        private Diff(KeyspaceMetadata before,
                              KeyspaceMetadata after,
+                             Difference difference,
                              TablesDiff tables,
                              ViewsDiff views,
                              TypesDiff types,
                              FunctionsDiff<UDFunction> udfs,
                              FunctionsDiff<UDAggregate> udas)
         {
-            this.before = before;
-            this.after = after;
+            super(before, after, difference);
             this.tables = tables;
             this.views = views;
             this.types = types;
@@ -300,7 +297,7 @@ public final class KeyspaceMetadata
             this.udas = udas;
         }
 
-        private static Optional<KeyspaceDiff> diff(KeyspaceMetadata before, KeyspaceMetadata after)
+        private static Optional<Diff> diff(KeyspaceMetadata before, KeyspaceMetadata after)
         {
             if (before == after)
                 return Optional.empty();
@@ -323,10 +320,20 @@ public final class KeyspaceMetadata
                 udas = Functions.udasDiff(before.functions, after.functions);
             }
 
-            if (before.params.equals(after.params) && tables.isEmpty() && views.isEmpty() && types.isEmpty() && udfs.isEmpty() && udas.isEmpty())
-                return Optional.empty();
+            Difference difference;
+            if (before.params.equals(after.params))
+            {
+                if (tables.isEmpty() && views.isEmpty() && types.isEmpty() && udfs.isEmpty() && udas.isEmpty())
+                    return Optional.empty();
 
-            return Optional.of(new KeyspaceDiff(before, after, tables, views, types, udfs, udas));
+                difference = Difference.SHALLOW;
+            }
+            else
+            {
+                difference = Difference.DEEP;
+            }
+            return Optional.of(new Diff(before, after, difference, tables, views, types, udfs, udas));
+
         }
     }
 }

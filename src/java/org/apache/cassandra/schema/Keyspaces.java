@@ -27,8 +27,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.collect.*;
 
-import org.apache.cassandra.schema.KeyspaceMetadata.KeyspaceDiff;
-
 public final class Keyspaces implements Iterable<KeyspaceMetadata>
 {
     private static final Keyspaces NONE = builder().build();
@@ -189,51 +187,6 @@ public final class Keyspaces implements Iterable<KeyspaceMetadata>
         {
             keyspaces.forEach(this::add);
             return this;
-        }
-    }
-
-    static KeyspacesDiff diff(Keyspaces before, Keyspaces after)
-    {
-        return KeyspacesDiff.diff(before, after);
-    }
-
-    public static final class KeyspacesDiff
-    {
-        static final KeyspacesDiff NONE = new KeyspacesDiff(Keyspaces.none(), Keyspaces.none(), ImmutableList.of());
-
-        public final Keyspaces created;
-        public final Keyspaces dropped;
-        public final ImmutableList<KeyspaceDiff> altered;
-
-        private KeyspacesDiff(Keyspaces created, Keyspaces dropped, ImmutableList<KeyspaceDiff> altered)
-        {
-            this.created = created;
-            this.dropped = dropped;
-            this.altered = altered;
-        }
-
-        private static KeyspacesDiff diff(Keyspaces before, Keyspaces after)
-        {
-            if (before == after)
-                return NONE;
-
-            Keyspaces created = after.filter(k -> !before.containsKeyspace(k.name));
-            Keyspaces dropped = before.filter(k -> !after.containsKeyspace(k.name));
-
-            ImmutableList.Builder<KeyspaceDiff> altered = ImmutableList.builder();
-            before.forEach(keyspaceBefore ->
-            {
-                KeyspaceMetadata keyspaceAfter = after.getNullable(keyspaceBefore.name);
-                if (null != keyspaceAfter)
-                    KeyspaceMetadata.diff(keyspaceBefore, keyspaceAfter).ifPresent(altered::add);
-            });
-
-            return new KeyspacesDiff(created, dropped, altered.build());
-        }
-
-        public boolean isEmpty()
-        {
-            return created.isEmpty() && dropped.isEmpty() && altered.isEmpty();
         }
     }
 }

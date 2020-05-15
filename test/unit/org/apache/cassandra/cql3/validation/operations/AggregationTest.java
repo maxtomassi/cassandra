@@ -75,11 +75,11 @@ public class AggregationTest extends CQLTester
                                   InvalidRequestException.class,
                                   "DROP AGGREGATE " + KEYSPACE + ".aggr_does_not_exist(int,text)");
 
-        assertInvalidThrowMessage("Aggregate 'keyspace_does_not_exist.aggr_does_not_exist' doesn't exist",
+        assertInvalidThrowMessage("Keyspace 'keyspace_does_not_exist' doesn't exist",
                                   InvalidRequestException.class,
                                   "DROP AGGREGATE keyspace_does_not_exist.aggr_does_not_exist");
 
-        assertInvalidThrowMessage("Aggregate 'keyspace_does_not_exist.aggr_does_not_exist(int, text)' doesn't exist",
+        assertInvalidThrowMessage("Keyspace 'keyspace_does_not_exist' doesn't exist",
                                   InvalidRequestException.class,
                                   "DROP AGGREGATE keyspace_does_not_exist.aggr_does_not_exist(int,text)");
 
