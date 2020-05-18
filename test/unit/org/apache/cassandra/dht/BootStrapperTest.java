@@ -48,7 +48,7 @@ import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.Replica;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.tokenallocator.TokenAllocation;
 import org.apache.cassandra.exceptions.ConfigurationException;
@@ -90,7 +90,7 @@ public class BootStrapperTest
     public void testSourceTargetComputation() throws UnknownHostException
     {
         final int[] clusterSizes = new int[] { 1, 3, 5, 10, 100};
-        for (String keyspaceName : Schema.instance.getNonLocalStrategyKeyspaces())
+        for (String keyspaceName : SchemaManager.instance.getNonLocalStrategyKeyspaces())
         {
             int replicationFactor = Keyspace.open(keyspaceName).getReplicationStrategy().getReplicationFactor().allReplicas;
             for (int clusterSize : clusterSizes)

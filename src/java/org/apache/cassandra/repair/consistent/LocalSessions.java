@@ -59,7 +59,7 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.locator.Replica;
 import org.apache.cassandra.repair.KeyspaceRepairManager;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.schema.SchemaConstants;
@@ -417,8 +417,8 @@ public class LocalSessions
 
     private void syncTable()
     {
-        TableId tid = Schema.instance.getTableMetadata(keyspace, table).id;
-        ColumnFamilyStore cfm = Schema.instance.getColumnFamilyStoreInstance(tid);
+        TableId tid = SchemaManager.instance.getTableMetadata(keyspace, table).id;
+        ColumnFamilyStore cfm = SchemaManager.instance.getColumnFamilyStoreInstance(tid);
         cfm.forceBlockingFlush();
     }
 
@@ -724,7 +724,7 @@ public class LocalSessions
     {
         for (TableId tid: session.tableIds)
         {
-            ColumnFamilyStore cfs = Schema.instance.getColumnFamilyStoreInstance(tid);
+            ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(tid);
             if (cfs != null)
             {
                 cfs.getRepairManager().incrementalSessionCompleted(session.sessionID);
@@ -845,7 +845,7 @@ public class LocalSessions
     protected boolean sessionHasData(LocalSession session)
     {
         Predicate<TableId> predicate = tid -> {
-            ColumnFamilyStore cfs = Schema.instance.getColumnFamilyStoreInstance(tid);
+            ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(tid);
             return cfs != null && cfs.getCompactionStrategyManager().hasDataForPendingRepair(session.sessionID);
 
         };

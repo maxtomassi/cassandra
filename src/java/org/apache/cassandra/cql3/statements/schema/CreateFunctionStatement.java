@@ -34,7 +34,7 @@ import org.apache.cassandra.cql3.functions.UDFunction;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Keyspaces;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Target;
@@ -135,7 +135,7 @@ public final class CreateFunctionStatement extends AbstractCreateFunctionStateme
     @Override
     public void authorize(ClientState client)
     {
-        if (Schema.instance.findFunction(functionName, Lists.transform(rawArgumentTypes, t -> t.prepare(keyspaceName).getType())).isPresent() && orReplace)
+        if (SchemaManager.instance.findFunction(functionName, Lists.transform(rawArgumentTypes, t -> t.prepare(keyspaceName).getType())).isPresent() && orReplace)
             client.ensurePermission(Permission.ALTER, FunctionResource.functionFromCql(keyspaceName, functionName.name, rawArgumentTypes));
         else
             client.ensurePermission(Permission.CREATE, FunctionResource.keyspace(keyspaceName));

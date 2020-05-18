@@ -44,7 +44,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.Version;
@@ -58,7 +57,7 @@ import org.apache.cassandra.config.EncryptionOptions;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.ResourceLimits;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaChangeListener;
 import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.service.*;
@@ -108,7 +107,7 @@ public class Server implements CassandraDaemon.Server
         }
         EventNotifier notifier = new EventNotifier(this);
         StorageService.instance.register(notifier);
-        Schema.instance.registerListener(notifier);
+        SchemaManager.instance.registerListener(notifier);
     }
 
     public void stop()

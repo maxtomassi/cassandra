@@ -711,13 +711,13 @@ public class CreateTest extends CQLTester
 
     private void assertTriggerExists(String name)
     {
-        TableMetadata metadata = Schema.instance.getTableMetadata(keyspace(), currentTable());
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(keyspace(), currentTable());
         assertTrue("the trigger does not exist", metadata.triggers.get(name).isPresent());
     }
 
     private void assertTriggerDoesNotExists(String name)
     {
-        TableMetadata metadata = Schema.instance.getTableMetadata(keyspace(), currentTable());
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(keyspace(), currentTable());
         assertFalse("the trigger exists", metadata.triggers.get(name).isPresent());
     }
 

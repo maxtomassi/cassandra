@@ -25,7 +25,7 @@ import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.dht.LocalPartitioner;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 
 import static org.apache.cassandra.schema.TableMetadata.builder;
@@ -58,7 +58,7 @@ public final class VirtualSchemaKeyspace extends VirtualKeyspace
         public DataSet data()
         {
             SimpleDataSet result = new SimpleDataSet(metadata());
-            for (KeyspaceMetadata keyspace : Schema.instance.localKeyspaces().getVirtualKeyspacesMetadata())
+            for (KeyspaceMetadata keyspace : SchemaManager.instance.localKeyspaces().getVirtualKeyspacesMetadata())
                 result.row(keyspace.name);
             return result;
         }
@@ -86,7 +86,7 @@ public final class VirtualSchemaKeyspace extends VirtualKeyspace
         {
             SimpleDataSet result = new SimpleDataSet(metadata());
 
-            for (KeyspaceMetadata keyspace : Schema.instance.localKeyspaces().getVirtualKeyspacesMetadata())
+            for (KeyspaceMetadata keyspace : SchemaManager.instance.localKeyspaces().getVirtualKeyspacesMetadata())
             {
                 for (TableMetadata table : keyspace.tables)
                 {
@@ -131,7 +131,7 @@ public final class VirtualSchemaKeyspace extends VirtualKeyspace
         {
             SimpleDataSet result = new SimpleDataSet(metadata());
 
-            for (KeyspaceMetadata keyspace : Schema.instance.localKeyspaces().getVirtualKeyspacesMetadata())
+            for (KeyspaceMetadata keyspace : SchemaManager.instance.localKeyspaces().getVirtualKeyspacesMetadata())
             {
                 for (TableMetadata table : keyspace.tables)
                 {

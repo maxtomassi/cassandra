@@ -39,7 +39,7 @@ import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.cql3.functions.FunctionName;
 import org.apache.cassandra.exceptions.FunctionExecutionException;
 import org.apache.cassandra.exceptions.InvalidRequestException;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.transport.ProtocolVersion;
 
 public class UFJavaTest extends CQLTester
@@ -651,7 +651,7 @@ public class UFJavaTest extends CQLTester
                               "AS $$return " +
                               "     udt.getString(\"txt\");$$;",
                               fName1replace, type));
-        Assert.assertEquals(1, Schema.instance.getFunctions(parseFunctionName(fName1replace)).size());
+        Assert.assertEquals(1, SchemaManager.instance.getFunctions(parseFunctionName(fName1replace)).size());
         execute(String.format("CREATE OR REPLACE FUNCTION %s( udt %s ) " +
                               "CALLED ON NULL INPUT " +
                               "RETURNS int " +
@@ -659,7 +659,7 @@ public class UFJavaTest extends CQLTester
                               "AS $$return " +
                               "     Integer.valueOf(udt.getInt(\"i\"));$$;",
                               fName2replace, type));
-        Assert.assertEquals(1, Schema.instance.getFunctions(parseFunctionName(fName2replace)).size());
+        Assert.assertEquals(1, SchemaManager.instance.getFunctions(parseFunctionName(fName2replace)).size());
         execute(String.format("CREATE OR REPLACE FUNCTION %s( udt %s ) " +
                               "CALLED ON NULL INPUT " +
                               "RETURNS double " +
@@ -667,7 +667,7 @@ public class UFJavaTest extends CQLTester
                               "AS $$return " +
                               "     Double.valueOf(udt.getDouble(\"added\"));$$;",
                               fName3replace, type));
-        Assert.assertEquals(1, Schema.instance.getFunctions(parseFunctionName(fName3replace)).size());
+        Assert.assertEquals(1, SchemaManager.instance.getFunctions(parseFunctionName(fName3replace)).size());
         execute(String.format("CREATE OR REPLACE FUNCTION %s( udt %s ) " +
                               "RETURNS NULL ON NULL INPUT " +
                               "RETURNS %s " +
@@ -675,7 +675,7 @@ public class UFJavaTest extends CQLTester
                               "AS $$return " +
                               "     udt;$$;",
                               fName4replace, type, type));
-        Assert.assertEquals(1, Schema.instance.getFunctions(parseFunctionName(fName4replace)).size());
+        Assert.assertEquals(1, SchemaManager.instance.getFunctions(parseFunctionName(fName4replace)).size());
 
         assertRows(execute("SELECT " + fName1replace + "(udt) FROM %s WHERE key = 2"),
                    row("two"));

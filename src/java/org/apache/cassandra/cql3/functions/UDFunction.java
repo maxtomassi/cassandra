@@ -54,7 +54,7 @@ import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.Difference;
 import org.apache.cassandra.schema.Functions;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.service.ClientWarn;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.transport.ProtocolVersion;
@@ -216,7 +216,7 @@ public abstract class UDFunction extends AbstractFunction implements ScalarFunct
         this.argCodecs = UDHelper.codecsFor(argDataTypes);
         this.returnCodec = UDHelper.codecFor(returnDataType);
         this.calledOnNullInput = calledOnNullInput;
-        KeyspaceMetadata keyspaceMetadata = Schema.instance.getKeyspaceMetadata(name.keyspace);
+        KeyspaceMetadata keyspaceMetadata = SchemaManager.instance.getKeyspaceMetadata(name.keyspace);
         this.udfContext = new UDFContextImpl(argNames, argCodecs, returnCodec,
                                              keyspaceMetadata);
     }

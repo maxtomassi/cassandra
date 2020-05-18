@@ -34,7 +34,7 @@ import org.apache.cassandra.schema.Functions;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Keyspaces;
 import org.apache.cassandra.schema.KeyspacesDiff;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TransformationSide;
 import org.apache.cassandra.service.ClientState;
 
@@ -137,7 +137,7 @@ abstract class AbstractDropFunctionStatement extends AbstractFunctionStatement
     @Override
     public void authorize(ClientState client)
     {
-        KeyspaceMetadata keyspace = Schema.instance.getKeyspaceMetadata(keyspaceName);
+        KeyspaceMetadata keyspace = SchemaManager.instance.getKeyspaceMetadata(keyspaceName);
         if (null == keyspace)
             return;
 

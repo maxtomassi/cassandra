@@ -2036,7 +2036,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public static Iterable<ColumnFamilyStore> all()
     {
-        List<Iterable<ColumnFamilyStore>> stores = new ArrayList<Iterable<ColumnFamilyStore>>(Schema.instance.getAllKeyspaces().size());
+        List<Iterable<ColumnFamilyStore>> stores = new ArrayList<Iterable<ColumnFamilyStore>>(SchemaManager.instance.getAllKeyspaces().size());
         for (Keyspace keyspace : Keyspace.all())
         {
             stores.add(keyspace.getColumnFamilyStores());
@@ -2609,7 +2609,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
      */
     public static ColumnFamilyStore getIfExists(TableId id)
     {
-        TableMetadata metadata = Schema.instance.getTableMetadata(id);
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(id);
         if (metadata == null)
             return null;
 
@@ -2635,7 +2635,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         if (keyspace == null)
             return null;
 
-        TableMetadata table = Schema.instance.getTableMetadata(ksName, cfName);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(ksName, cfName);
         if (table == null)
             return null;
 

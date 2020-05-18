@@ -88,7 +88,7 @@ final class MigrationTask extends WrappedRunnable
         {
             try
             {
-                Schema.instance.mergeAndAnnounceVersion(msg.payload);
+                SchemaManager.instance.mergeAndAnnounceVersion(msg.payload);
             }
             catch (ConfigurationException e)
             {

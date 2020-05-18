@@ -32,7 +32,7 @@ import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.rows.Cell;
@@ -167,7 +167,7 @@ public class HintsWriteThenReadTest
 
     private static Mutation createMutation(int index, long timestamp)
     {
-        TableMetadata table = Schema.instance.getTableMetadata(KEYSPACE, TABLE);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(KEYSPACE, TABLE);
         return new RowUpdateBuilder(table, timestamp, bytes(index))
                .clustering(bytes(index))
                .add("val", bytes(index))

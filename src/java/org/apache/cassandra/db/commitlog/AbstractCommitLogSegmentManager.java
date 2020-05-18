@@ -33,7 +33,7 @@ import net.nicoulaj.compilecommand.annotations.DontInline;
 import org.apache.cassandra.concurrent.NamedThreadFactory;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
@@ -381,7 +381,7 @@ public abstract class AbstractCommitLogSegmentManager
         {
             for (TableId dirtyTableId : segment.getDirtyTableIds())
             {
-                TableMetadata metadata = Schema.instance.getTableMetadata(dirtyTableId);
+                TableMetadata metadata = SchemaManager.instance.getTableMetadata(dirtyTableId);
                 if (metadata == null)
                 {
                     // even though we remove the schema entry before a final flush when dropping a CF,
