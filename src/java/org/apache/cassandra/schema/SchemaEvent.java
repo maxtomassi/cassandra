@@ -86,7 +86,7 @@ public final class SchemaEvent extends DiagnosticEvent
         SCHEMATA_CLEARED
     }
 
-    SchemaEvent(SchemaEventType type, Schema schema, @Nullable KeyspaceMetadata ksUpdate,
+    SchemaEvent(SchemaEventType type, SchemaManager schemaManager, @Nullable KeyspaceMetadata ksUpdate,
                 @Nullable KeyspaceMetadata previous, @Nullable KeyspaceMetadata.Diff ksDiff,
                 @Nullable TableMetadata tableUpdate, @Nullable Tables.TablesDiff tablesDiff,
                 @Nullable Views.ViewsDiff viewsDiff, @Nullable MapDifference<String,TableMetadata> indexesDiff)
@@ -100,13 +100,13 @@ public final class SchemaEvent extends DiagnosticEvent
         this.viewsDiff = viewsDiff;
         this.indexesDiff = indexesDiff;
 
-        this.keyspaces = new HashSet<>(schema.getAllKeyspaces());
-        this.nonSystemKeyspaces = new ArrayList<>(schema.getNonLocalSystemKeyspaces());
-        this.userKeyspaces = new ArrayList<>(schema.getUserKeyspaces());
-        this.numberOfTables = schema.getNumberOfTables();
-        this.version = schema.getVersion();
+        this.keyspaces = new HashSet<>(schemaManager.getAllKeyspaces());
+        this.nonSystemKeyspaces = new ArrayList<>(schemaManager.getNonLocalSystemKeyspaces());
+        this.userKeyspaces = new ArrayList<>(schemaManager.getUserKeyspaces());
+        this.numberOfTables = schemaManager.getNumberOfTables();
+        this.version = schemaManager.getVersion();
 
-        Map<Pair<String, String>, TableMetadataRef> indexTableMetadataRefs = schema.getIndexTableMetadataRefs();
+        Map<Pair<String, String>, TableMetadataRef> indexTableMetadataRefs = schemaManager.getIndexTableMetadataRefs();
         Map<String, String> indexTables = indexTableMetadataRefs.entrySet().stream()
                                                                 .collect(Collectors.toMap(e -> e.getKey().left + ',' +
                                                                                                e.getKey().right,
@@ -114,7 +114,7 @@ public final class SchemaEvent extends DiagnosticEvent
                                                                                                e.getValue().keyspace + ',' +
                                                                                                e.getValue().name));
         this.indexTables = new HashMap<>(indexTables);
-        Map<TableId, TableMetadataRef> tableMetadataRefs = schema.getTableMetadataRefs();
+        Map<TableId, TableMetadataRef> tableMetadataRefs = schemaManager.getTableMetadataRefs();
         Map<String, String> tables = tableMetadataRefs.entrySet().stream()
                                                       .collect(Collectors.toMap(e -> e.getKey().toHexString(),
                                                                                 e -> e.getValue().id.toHexString() + ',' +

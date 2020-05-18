@@ -29,7 +29,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.apache.commons.cli.*;
 
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Directories;
 import org.apache.cassandra.db.Keyspace;
@@ -69,9 +69,9 @@ public class StandaloneScrubber
         try
         {
             // load keyspace descriptions.
-            Schema.instance.loadFromDisk(false);
+            SchemaManager.instance.loadFromDisk(false);
 
-            if (Schema.instance.getKeyspaceMetadata(options.keyspaceName) == null)
+            if (SchemaManager.instance.getKeyspaceMetadata(options.keyspaceName) == null)
                 throw new IllegalArgumentException(String.format("Unknown keyspace %s", options.keyspaceName));
 
             // Do not load sstables since they might be broken
@@ -121,7 +121,7 @@ public class StandaloneScrubber
 
                 SSTableHeaderFix.Builder headerFixBuilder = SSTableHeaderFix.builder()
                                                                             .logToList(logOutput)
-                                                                            .schemaCallback(() -> Schema.instance::getTableMetadata);
+                                                                            .schemaCallback(() -> SchemaManager.instance::getTableMetadata);
                 if (options.headerFixMode == Options.HeaderFixMode.VALIDATE)
                     headerFixBuilder = headerFixBuilder.dryRun();
 

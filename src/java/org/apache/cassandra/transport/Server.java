@@ -61,7 +61,7 @@ import org.apache.cassandra.db.marshal.UserType;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.ResourceLimits;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaChangeListener;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.ViewMetadata;
@@ -113,7 +113,7 @@ public class Server implements CassandraDaemon.Server
         }
         EventNotifier notifier = new EventNotifier(this);
         StorageService.instance.register(notifier);
-        Schema.instance.registerListener(notifier);
+        SchemaManager.instance.registerListener(notifier);
     }
 
     public void stop()

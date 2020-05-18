@@ -47,7 +47,7 @@ import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.io.util.RandomAccessReader;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadataRef;
@@ -240,7 +240,7 @@ public class CommitLogReplayer implements CommitLogReadHandler
             {
                 public void runMayThrow()
                 {
-                    if (Schema.instance.getKeyspaceMetadata(mutation.getKeyspaceName()) == null)
+                    if (SchemaManager.instance.getKeyspaceMetadata(mutation.getKeyspaceName()) == null)
                         return;
                     if (commitLogReplayer.pointInTimeExceeded(mutation))
                         return;
@@ -255,7 +255,7 @@ public class CommitLogReplayer implements CommitLogReadHandler
                     Mutation.PartitionUpdateCollector newPUCollector = null;
                     for (PartitionUpdate update : commitLogReplayer.replayFilter.filter(mutation))
                     {
-                        if (Schema.instance.getTableMetadata(update.metadata().id) == null)
+                        if (SchemaManager.instance.getTableMetadata(update.metadata().id) == null)
                             continue; // dropped
 
                         // replay if current segment is newer than last flushed one or,
@@ -335,7 +335,7 @@ public class CommitLogReplayer implements CommitLogReadHandler
                 if (pair.length != 2)
                     throw new IllegalArgumentException("Each table to be replayed must be fully qualified with keyspace name, e.g., 'system.peers'");
 
-                Keyspace ks = Schema.instance.getKeyspaceInstance(pair[0]);
+                Keyspace ks = SchemaManager.instance.getKeyspaceInstance(pair[0]);
                 if (ks == null)
                     throw new IllegalArgumentException("Unknown keyspace " + pair[0]);
                 ColumnFamilyStore cfs = ks.getColumnFamilyStore(pair[1]);

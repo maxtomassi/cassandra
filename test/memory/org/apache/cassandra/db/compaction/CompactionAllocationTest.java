@@ -56,12 +56,11 @@ import org.apache.cassandra.db.filter.ColumnFilter;
 import org.apache.cassandra.db.partitions.UnfilteredPartitionIterator;
 import org.apache.cassandra.db.partitions.UnfilteredPartitionIterators;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.io.util.UnbufferedDataOutputStreamPlus;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
@@ -464,7 +463,7 @@ public class CompactionAllocationTest
         SchemaLoader.createKeyspace(ksname, KeyspaceParams.simple(1),
                                     CreateTableStatement.parse("CREATE TABLE tbl (k INT PRIMARY KEY, v INT)", ksname).build());
 
-        ColumnFamilyStore cfs = Schema.instance.getColumnFamilyStoreInstance(Schema.instance.getTableMetadata(ksname, "tbl").id);
+        ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(SchemaManager.instance.getTableMetadata(ksname, "tbl").id);
         Assert.assertNotNull(cfs);
         cfs.disableAutoCompaction();
         List<Runnable> reads = new ArrayList<>(numSSTable * (overlap ? 1 : sstablePartitions));
@@ -573,7 +572,7 @@ public class CompactionAllocationTest
         SchemaLoader.createKeyspace(ksname, KeyspaceParams.simple(1),
                                     CreateTableStatement.parse("CREATE TABLE tbl (k text, c text, v1 text, v2 text, v3 text, v4 text, PRIMARY KEY (k, c))", ksname).build());
 
-        ColumnFamilyStore cfs = Schema.instance.getColumnFamilyStoreInstance(Schema.instance.getTableMetadata(ksname, "tbl").id);
+        ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(SchemaManager.instance.getTableMetadata(ksname, "tbl").id);
         Assert.assertNotNull(cfs);
         cfs.disableAutoCompaction();
         int rowsPerPartition = 200;
@@ -672,7 +671,7 @@ public class CompactionAllocationTest
         SchemaLoader.createKeyspace(ksname, KeyspaceParams.simple(1),
                                     CreateTableStatement.parse("CREATE TABLE tbl (k text, c text, v1 text, v2 text, v3 text, v4 text, PRIMARY KEY (k, c))", ksname).build());
 
-        ColumnFamilyStore cfs = Schema.instance.getColumnFamilyStoreInstance(Schema.instance.getTableMetadata(ksname, "tbl").id);
+        ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(SchemaManager.instance.getTableMetadata(ksname, "tbl").id);
         Assert.assertNotNull(cfs);
         cfs.disableAutoCompaction();
         int rowWidth = 100;

@@ -47,9 +47,9 @@ import static java.lang.String.format;
 
 import static com.google.common.collect.Iterables.size;
 
-public final class Schema
+public final class SchemaManager
 {
-    public static final Schema instance = new Schema();
+    public static final SchemaManager instance = new SchemaManager();
 
     private volatile Keyspaces keyspaces = Keyspaces.none();
 
@@ -71,7 +71,7 @@ public final class Schema
     /**
      * Initialize empty schema object and load the hardcoded system tables
      */
-    private Schema()
+    private SchemaManager()
     {
         this.localKeyspaces = new LocalKeyspaces(this);
 

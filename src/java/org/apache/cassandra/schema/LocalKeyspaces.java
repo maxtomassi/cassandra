@@ -33,11 +33,11 @@ import org.apache.cassandra.db.virtual.VirtualSchemaKeyspace;
 import org.apache.cassandra.db.virtual.VirtualTable;
 
 /**
- * Maintains the definition of local keyspaces (local system keyspaces and virtual ones) for {@link Schema}.
+ * Maintains the definition of local keyspaces (local system keyspaces and virtual ones) for {@link SchemaManager}.
  */
 public class LocalKeyspaces
 {
-    private final Schema schema;
+    private final SchemaManager schemaManager;
 
     private final Map<String, KeyspaceMetadata> localSystemKeyspaces = new ConcurrentHashMap<>();
     private final Map<TableId, TableMetadata> localSystemTables = new ConcurrentHashMap<>();
@@ -45,9 +45,9 @@ public class LocalKeyspaces
     private final Map<String, VirtualKeyspace> virtualKeyspaces = new ConcurrentHashMap<>();
     private final Map<TableId, VirtualTable> virtualTables = new ConcurrentHashMap<>();
 
-    LocalKeyspaces(Schema schema)
+    LocalKeyspaces(SchemaManager schemaManager)
     {
-        this.schema = schema;
+        this.schemaManager = schemaManager;
     }
 
     /**
@@ -151,7 +151,7 @@ public class LocalKeyspaces
         for (TableMetadata tableMetadata : localKeyspace.tablesAndViews())
             localSystemTables.put(tableMetadata.id, tableMetadata);
 
-        schema.loadNew(localKeyspace);
+        schemaManager.loadNew(localKeyspace);
     }
 
     public void load(VirtualKeyspace keyspace)

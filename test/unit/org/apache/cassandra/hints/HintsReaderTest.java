@@ -38,7 +38,7 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.MigrationManager;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 
 import static junit.framework.Assert.assertEquals;
@@ -65,7 +65,7 @@ public class HintsReaderTest
 
     private static Mutation createMutation(int index, long timestamp, String ks, String tb)
     {
-        TableMetadata table = Schema.instance.getTableMetadata(ks, tb);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(ks, tb);
         return new RowUpdateBuilder(table, timestamp, bytes(index))
                .clustering(bytes(index))
                .add("val", bytes(index))

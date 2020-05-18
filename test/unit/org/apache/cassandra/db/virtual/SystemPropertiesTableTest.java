@@ -33,7 +33,7 @@ import org.junit.Test;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import org.apache.cassandra.cql3.CQLTester;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -56,7 +56,7 @@ public class SystemPropertiesTableTest extends CQLTester
     public void config()
     {
         table = new SystemPropertiesTable(KS_NAME);
-        Schema.instance.localKeyspaces().load(new VirtualKeyspace(KS_NAME, ImmutableList.of(table)));
+        SchemaManager.instance.localKeyspaces().load(new VirtualKeyspace(KS_NAME, ImmutableList.of(table)));
     }
 
     @Test

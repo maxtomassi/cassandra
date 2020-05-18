@@ -37,7 +37,7 @@ import org.apache.cassandra.db.virtual.SimpleDataSet;
 import org.apache.cassandra.db.virtual.VirtualKeyspace;
 import org.apache.cassandra.db.virtual.VirtualTable;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.service.StorageServiceMBean;
@@ -119,7 +119,7 @@ public class VirtualTableTest extends CQLTester
 
         CQLTester.setUpClass();
 
-        Schema.instance.localKeyspaces().load(new VirtualKeyspace(KS_NAME, ImmutableList.of(vt1, vt2)));
+        SchemaManager.instance.localKeyspaces().load(new VirtualKeyspace(KS_NAME, ImmutableList.of(vt1, vt2)));
     }
 
     @Test
