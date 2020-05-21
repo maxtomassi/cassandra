@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,10 +50,12 @@ final class MigrationTask extends WrappedRunnable
     private static final Set<BootstrapState> monitoringBootstrapStates = EnumSet.of(BootstrapState.NEEDS_BOOTSTRAP, BootstrapState.IN_PROGRESS);
 
     private final InetAddressAndPort endpoint;
+    private final Consumer<Collection<Mutation>> applySchemaMigration;
 
-    MigrationTask(InetAddressAndPort endpoint)
+    MigrationTask(InetAddressAndPort endpoint, Consumer<Collection<Mutation>> applySchemaMigration)
     {
         this.endpoint = endpoint;
+        this.applySchemaMigration = applySchemaMigration;
         SchemaMigrationDiagnostics.taskCreated(endpoint);
     }
 
@@ -88,7 +91,7 @@ final class MigrationTask extends WrappedRunnable
         {
             try
             {
-                SchemaManager.instance.mergeAndAnnounceVersion(msg.payload);
+                applySchemaMigration.accept(msg.payload);
             }
             catch (ConfigurationException e)
             {

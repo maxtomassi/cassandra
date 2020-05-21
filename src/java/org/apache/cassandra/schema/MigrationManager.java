@@ -18,6 +18,7 @@
 package org.apache.cassandra.schema;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.*;
 import java.lang.management.ManagementFactory;
@@ -43,11 +44,15 @@ import org.apache.cassandra.utils.FBUtilities;
 import static org.apache.cassandra.concurrent.Stage.MIGRATION;
 import static org.apache.cassandra.net.Verb.SCHEMA_PUSH_REQ;
 
+/**
+ * Handles "migrations" (PUSH, PULL) for the schema code.
+ * <p>
+ * Migrations refer to the PUSH of schema changes from the schema update coordinator to other nodes, and the PULL
+ * of schema triggered when the local node notices its schema version differs from that of another node.
+ */
 public class MigrationManager
 {
     private static final Logger logger = LoggerFactory.getLogger(MigrationManager.class);
-
-    public static final MigrationManager instance = new MigrationManager();
 
     private static final RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
 
@@ -55,20 +60,29 @@ public class MigrationManager
 
     private static final int MIGRATION_TASK_WAIT_IN_SECONDS = Integer.parseInt(System.getProperty("cassandra.migration_task_wait_in_seconds", "1"));
 
-    private MigrationManager() {}
+    private final DefaultSchemaUpdateHandler updateHandler;
 
-    public static void scheduleSchemaPull(InetAddressAndPort endpoint, EndpointState state)
+    MigrationManager(DefaultSchemaUpdateHandler updateHandler)
     {
-        UUID schemaVersion = state.getSchemaVersion();
-        if (!endpoint.equals(FBUtilities.getBroadcastAddressAndPort()) && schemaVersion != null)
-            maybeScheduleSchemaPull(schemaVersion, endpoint, state.getApplicationState(ApplicationState.RELEASE_VERSION).value);
+        this.updateHandler = updateHandler;
+    }
+
+    /**
+     * Apply a schema migration received from a remote node.
+     *
+     * @param mutations the mutations of the schema migration to apply
+     * @return a future on the application of the migration.
+     */
+    public CompletableFuture<Void> apply(Collection<Mutation> mutations)
+    {
+        return updateHandler.applySchemaMigration(mutations);
     }
 
     /**
      * If versions differ this node sends request with local migration list to the endpoint
-     * and expecting to receive a list of migrations to apply locally.
+     * and expecting to receive a list of migrations to applySchemaMigration locally.
      */
-    private static void maybeScheduleSchemaPull(final UUID theirVersion, final InetAddressAndPort endpoint, String releaseVersion)
+    void maybeScheduleSchemaPull(final UUID theirVersion, final InetAddressAndPort endpoint, String releaseVersion)
     {
         String ourMajorVersion = FBUtilities.getReleaseVersionMajor();
         if (!releaseVersion.startsWith(ourMajorVersion))
@@ -87,7 +101,7 @@ public class MigrationManager
         {
             logger.debug("Not pulling schema from {}, because schema versions match ({})",
                          endpoint,
-                         SchemaManager.schemaVersionToString(theirVersion));
+                         schemaVersionToString(theirVersion));
             SchemaMigrationDiagnostics.versionMatch(endpoint, theirVersion);
             return;
         }
@@ -105,13 +119,13 @@ public class MigrationManager
             logger.debug("Immediately submitting migration task for {}, " +
                          "schema versions: local={}, remote={}",
                          endpoint,
-                         SchemaManager.schemaVersionToString(SchemaManager.instance.getVersion()),
-                         SchemaManager.schemaVersionToString(theirVersion));
+                         schemaVersionToString(SchemaManager.instance.getVersion()),
+                         schemaVersionToString(theirVersion));
             submitMigrationTask(endpoint);
         }
         else
         {
-            // Include a delay to make sure we have a chance to apply any changes being
+            // Include a delay to make sure we have a chance to applySchemaMigration any changes being
             // pushed out simultaneously. See CASSANDRA-5025
             Runnable runnable = () ->
             {
@@ -129,32 +143,48 @@ public class MigrationManager
                 }
                 logger.debug("Submitting migration task for {}, schema version mismatch: local={}, remote={}",
                              endpoint,
-                             SchemaManager.schemaVersionToString(SchemaManager.instance.getVersion()),
-                             SchemaManager.schemaVersionToString(epSchemaVersion));
+                             schemaVersionToString(SchemaManager.instance.getVersion()),
+                             schemaVersionToString(epSchemaVersion));
                 submitMigrationTask(endpoint);
             };
             ScheduledExecutors.nonPeriodicTasks.schedule(runnable, MIGRATION_DELAY_IN_MS, TimeUnit.MILLISECONDS);
         }
     }
 
-    private static Future<?> submitMigrationTask(InetAddressAndPort endpoint)
+    // TODO: [max] we need this because we don't have a PullRequestScheduler in OSS
+    private Future<?> submitMigrationTask(InetAddressAndPort endpoint)
     {
         /*
          * Do not de-ref the future because that causes distributed deadlock (CASSANDRA-3832) because we are
          * running in the gossip stage.
          */
-        return MIGRATION.submit(new MigrationTask(endpoint));
+        return MIGRATION.submit(new MigrationTask(endpoint, this::apply));
     }
 
     static boolean shouldPullSchemaFrom(InetAddressAndPort endpoint)
     {
         /*
+         * Don't request schema from ourselves.
          * Don't request schema from nodes with a differnt or unknonw major version (may have incompatible schema)
          * Don't request schema from fat clients
          */
-        return MessagingService.instance().versions.knows(endpoint)
+        return !endpoint.equals(FBUtilities.getBroadcastAddressAndPort())
+                && MessagingService.instance().versions.knows(endpoint)
                 && MessagingService.instance().versions.getRaw(endpoint) == MessagingService.current_version
                 && !Gossiper.instance.isGossipOnlyMember(endpoint);
+    }
+
+    Future<?> pullSchemaFromAnyAvailableNode()
+    {
+        Optional<InetAddressAndPort> pullFrom = Gossiper.instance.getLiveMembers()
+                                                          .stream()
+                                                          .filter(MigrationManager::shouldPullSchemaFrom)
+                                                          .findFirst();
+
+        if (!pullFrom.isPresent())
+            return CompletableFuture.completedFuture(null);
+
+        return submitMigrationTask(pullFrom.get());
     }
 
     private static boolean shouldPushSchemaTo(InetAddressAndPort endpoint)
@@ -381,41 +411,6 @@ public class MigrationManager
     }
 
     /**
-     * Clear all locally stored schema information and reset schema to initial state.
-     * Called by user (via JMX) who wants to get rid of schema disagreement.
-     */
-    public static void resetLocalSchema()
-    {
-        logger.info("Starting local schema reset...");
-
-        logger.debug("Truncating schema tables...");
-
-        SchemaMigrationDiagnostics.resetLocalSchema();
-
-        SchemaKeyspace.truncate();
-
-        logger.debug("Clearing local schema keyspace definitions...");
-
-        SchemaManager.instance.clear();
-
-        Set<InetAddressAndPort> liveEndpoints = Gossiper.instance.getLiveMembers();
-        liveEndpoints.remove(FBUtilities.getBroadcastAddressAndPort());
-
-        // force migration if there are nodes around
-        for (InetAddressAndPort node : liveEndpoints)
-        {
-            if (shouldPullSchemaFrom(node))
-            {
-                logger.debug("Requesting schema from {}", node);
-                FBUtilities.waitOnFuture(submitMigrationTask(node));
-                break;
-            }
-        }
-
-        logger.info("Local schema reset is complete.");
-    }
-
-    /**
      * We have a set of non-local, distributed system keyspaces, e.g. system_traces, system_auth, etc.
      * (see {@link SchemaConstants#REPLICATED_SYSTEM_KEYSPACE_NAMES}), that need to be created on cluster initialisation,
      * and later evolved on major upgrades (sometimes minor too). This method compares the current known definitions
@@ -458,6 +453,34 @@ public class MigrationManager
         }
 
         return builder == null ? Optional.empty() : Optional.of(builder.build());
+    }
+
+    /**
+     * Converts the given schema version to a string. Returns {@code unknown}, if {@code version} is {@code null}
+     * or {@code "(empty)"}, if {@code version} refers to an empty schema.
+     */
+    static String schemaVersionToString(UUID version)
+    {
+        if (version == null)
+            return "unknown";
+        if (DefaultSchema.EMPTY_VERSION.equals(version))
+            return "(empty)";
+        return version.toString();
+    }
+
+    void pushMigrationToOtherNodes(Collection<Mutation> schemaTransformation)
+    {
+        Gossiper.instance.getLiveMembers()
+                         .stream()
+                         .filter(MigrationManager::shouldPushSchemaTo)
+                         .forEach(endpoint -> pushSchemaMutation(endpoint, schemaTransformation));
+    }
+
+    private static void pushSchemaMutation(InetAddressAndPort endpoint, Collection<Mutation> schemaTransformation)
+    {
+        logger.debug("Pushing schema to endpoint {}", endpoint);
+        Message<Collection<Mutation>> message = Message.out(SCHEMA_PUSH_REQ, schemaTransformation);
+        MessagingService.instance().send(message, endpoint);
     }
 
     public static class MigrationsSerializer implements IVersionedSerializer<Collection<Mutation>>

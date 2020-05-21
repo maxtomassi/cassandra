@@ -198,7 +198,7 @@ public final class CreateAggregateStatement extends AbstractCreateFunctionStatem
             }
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.functions.withAddedOrUpdated(aggregate)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.functions.withAddedOrUpdated(aggregate)));
     }
 
     @Override

@@ -69,7 +69,7 @@ public final class CreateKeyspaceStatement extends AlterSchemaStatement
 
         keyspace.params.validate(keyspaceName);
 
-        return schema.withAddedOrUpdated(keyspace);
+        return schema.withAddedOrReplaced(keyspace);
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

@@ -2122,7 +2122,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                         break;
                     case SCHEMA:
                         SystemKeyspace.updatePeerInfo(endpoint, "schema_version", UUID.fromString(value.value));
-                        MigrationManager.instance.scheduleSchemaPull(endpoint, epState);
+                        String reason = String.format("gossip schema version change to %s", value.value);
+                        SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), reason);
                         break;
                     case HOST_ID:
                         SystemKeyspace.updatePeerInfo(endpoint, "host_id", UUID.fromString(value.value));
@@ -3014,12 +3015,15 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         {
             onChange(endpoint, entry.getKey(), entry.getValue());
         }
-        MigrationManager.instance.scheduleSchemaPull(endpoint, epState);
+
+        if (epState.has(ApplicationState.SCHEMA))
+            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), "endpoint joined");
     }
 
     public void onAlive(InetAddressAndPort endpoint, EndpointState state)
     {
-        MigrationManager.instance.scheduleSchemaPull(endpoint, state);
+        if (state.has(ApplicationState.SCHEMA))
+            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, state.getSchemaVersion(), "endpoint alive");
 
         if (tokenMetadata.isMember(endpoint))
             notifyUp(endpoint);
@@ -5268,14 +5272,14 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         ColumnFamilyStore.rebuildSecondaryIndex(ksName, cfName, indices);
     }
 
-    public void resetLocalSchema() throws IOException
+    public void resetLocalSchema()
     {
-        MigrationManager.resetLocalSchema();
+        SchemaManager.instance.resetLegacyLocalSchema();
     }
 
     public void reloadLocalSchema()
     {
-        SchemaManager.instance.reloadSchemaAndAnnounceVersion();
+        SchemaManager.instance.tryReloadingSchemaFromDisk();
     }
 
     public void setTraceProbability(double probability)

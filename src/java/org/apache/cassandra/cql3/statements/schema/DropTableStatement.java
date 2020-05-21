@@ -73,7 +73,7 @@ public final class DropTableStatement extends AlterSchemaStatement
                       join(", ", transform(views, ViewMetadata::name)));
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.without(table)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.without(table)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

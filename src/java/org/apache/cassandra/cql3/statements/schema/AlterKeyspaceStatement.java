@@ -78,7 +78,7 @@ public final class AlterKeyspaceStatement extends AlterSchemaStatement
         validateNoRangeMovements();
         validateTransientReplication(keyspace.createReplicationStrategy(), newKeyspace.createReplicationStrategy());
 
-        return schema.withAddedOrUpdated(newKeyspace);
+        return schema.withAddedOrReplaced(newKeyspace);
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

@@ -138,9 +138,9 @@ public class KeyspacesDiff
      * keyspaces (without applying anything).
      *
      * @param transformation the transformation to test.
-     * @param before         the keyspaces to test-apply {@code transformation} on.
+     * @param before         the keyspaces to test-applySchemaMigration {@code transformation} on.
      * @return the diff of applying the provided transformation to the provided keyspaces.
-     * @throws RequestValidationException if the provided transformation does not apply cleanly on top of the provided
+     * @throws RequestValidationException if the provided transformation does not applySchemaMigration cleanly on top of the provided
      *                                    schema.
      */
     public static KeyspacesDiff testApply(SchemaTransformation transformation, Keyspaces before)

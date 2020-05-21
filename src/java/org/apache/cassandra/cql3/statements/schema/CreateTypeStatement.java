@@ -96,7 +96,7 @@ public final class CreateTypeStatement extends AlterSchemaStatement
                          .collect(toList());
 
         UserType udt = new UserType(keyspaceName, bytes(typeName), fieldNames, fieldTypes, true);
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.types.with(udt)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.types.with(udt)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

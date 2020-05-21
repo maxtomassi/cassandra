@@ -57,7 +57,7 @@ public final class DropViewStatement extends AlterSchemaStatement
             throw ire("Materialized view '%s.%s' doesn't exist", keyspaceName, viewName);
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.views.without(viewName)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.views.without(viewName)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

@@ -71,6 +71,15 @@ public final class SchemaConstants
     }
 
     /**
+     *
+     * @return whether the given keyspace is the local schema keyspace
+     */
+    public static boolean isSchemaKeyspace(String keyspaceName)
+    {
+        return keyspaceName.toLowerCase().equals(SCHEMA_KEYSPACE_NAME);
+    }
+
+    /**
      * @return whether or not the keyspace is a really system one (w/ LocalStrategy, unmodifiable, hardcoded)
      */
     public static boolean isLocalSystemKeyspace(String keyspaceName)

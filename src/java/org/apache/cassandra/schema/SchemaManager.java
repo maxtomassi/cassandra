@@ -18,10 +18,13 @@
 package org.apache.cassandra.schema;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Sets;
 
@@ -38,6 +41,7 @@ import org.apache.cassandra.exceptions.UnknownTableException;
 import org.apache.cassandra.gms.ApplicationState;
 import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.io.sstable.Descriptor;
+import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.LocalStrategy;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.Pair;
@@ -55,6 +59,8 @@ public final class SchemaManager
 
     private final LocalKeyspaces localKeyspaces;
 
+    private final SchemaUpdateHandler<?> updateHandler;
+
     // UUID -> mutable metadata ref map. We have to update these in place every time a table changes.
     private final Map<TableId, TableMetadataRef> metadataRefs = new NonBlockingHashMap<>();
 
@@ -66,13 +72,17 @@ public final class SchemaManager
 
     private volatile UUID version;
 
-    private final List<SchemaChangeListener> changeListeners = new CopyOnWriteArrayList<>();
+    final List<SchemaChangeListener> changeListeners = new CopyOnWriteArrayList<>();
 
     /**
      * Initialize empty schema object and load the hardcoded system tables
      */
     private SchemaManager()
     {
+        this.updateHandler = DatabaseDescriptor.isDaemonInitialized()
+                             ? new DefaultSchemaUpdateHandler(this)
+                             : new OfflineSchemaUpdateHandler(this);
+
         this.localKeyspaces = new LocalKeyspaces(this);
 
         if (DatabaseDescriptor.isDaemonInitialized() || DatabaseDescriptor.isToolInitialized())
@@ -81,32 +91,54 @@ public final class SchemaManager
         }
     }
 
+    /**
+     * The current schema.
+     */
+    public Schema schema()
+    {
+        return updateHandler.currentSchema();
+    }
+
+    /**
+     * The current schema update handler.
+     *
+     * This is not meant to be exposed publicly, but is when some handler specific behavior goes through messaging to
+     * obtain the current handler on the receiving side.
+     */
+    SchemaUpdateHandler<?> updateHandler()
+    {
+        return updateHandler;
+    }
+
     public LocalKeyspaces localKeyspaces()
     {
         return localKeyspaces;
     }
 
     /**
-     * load keyspace (keyspace) definitions, but do not initialize the keyspace instances.
-     * Schema version may be updated as the result.
+     * Reads the version of the schema saved locally on disk and "loads" it.
+     *
+     * <p>This should only be called if the current schema is empty (and only once), and it may throw otherwise.
      */
+    // TODO: [max] this is done
     public void loadFromDisk()
     {
-        loadFromDisk(true);
+        SchemaDiagnostics.schemataLoading(this);
+        updateHandler.initializeSchemaFromDisk().join();
+        SchemaDiagnostics.schemataLoaded(this);
     }
 
     /**
-     * Load schema definitions from disk.
+     * For tests, clear the in-memory representation of the schema without going through a proper schema change, and
+     * without updating the on-disk representation in particular.
      *
-     * @param updateVersion true if schema version needs to be updated
+     * <p>This is used for testing reloading the schema from disk and should not be used otherwise as this is
+     * completely unsafe.
      */
-    public void loadFromDisk(boolean updateVersion)
+    @VisibleForTesting
+    void clearInMemoryUnsafe()
     {
-        SchemaDiagnostics.schemataLoading(this);
-        SchemaKeyspace.fetchNonSystemKeyspaces().forEach(this::load);
-        if (updateVersion)
-            updateVersion();
-        SchemaDiagnostics.schemataLoaded(this);
+        updateHandler.clearSchemaUnsafe();
     }
 
     /**
@@ -119,26 +151,34 @@ public final class SchemaManager
         KeyspaceMetadata previous = keyspaces.getNullable(ksm.name);
 
         if (previous == null)
-            loadNew(ksm);
+            addNewRefs(ksm);
         else
-            reload(previous, ksm);
+            updateRefs(previous, ksm);
 
-        keyspaces = keyspaces.withAddedOrUpdated(ksm);
+        keyspaces = keyspaces.withAddedOrReplaced(ksm);
     }
 
-    void loadNew(KeyspaceMetadata ksm)
+    /**
+     * Adds the {@link TableMetadataRef} corresponding to the provided keyspace to {@link #metadataRefs} and
+     * {@link #indexMetadataRefs}, assuming the keyspace is new (in the sense of not being tracked by the manager yet).
+     */
+    void addNewRefs(KeyspaceMetadata ksm)
     {
         ksm.tablesAndViews()
            .forEach(metadata -> metadataRefs.put(metadata.id, new TableMetadataRef(metadata)));
 
         ksm.tables
-           .indexTables()
-           .forEach((name, metadata) -> indexMetadataRefs.put(Pair.create(ksm.name, name), new TableMetadataRef(metadata)));
+        .indexTables()
+        .forEach((name, metadata) -> indexMetadataRefs.put(Pair.create(ksm.name, name), new TableMetadataRef(metadata)));
 
         SchemaDiagnostics.metadataInitialized(this, ksm);
     }
 
-    void reload(KeyspaceMetadata previous, KeyspaceMetadata updated)
+    /**
+     * Updates the {@link TableMetadataRef} in {@link #metadataRefs} and {@link #indexMetadataRefs}, for an
+     * existing updated keyspace given it's previous and new definition.
+     */
+    void updateRefs(KeyspaceMetadata previous, KeyspaceMetadata updated)
     {
         Keyspace keyspace = getKeyspaceInstance(updated.name);
         if (null != keyspace)
@@ -176,6 +216,24 @@ public final class SchemaManager
                    .forEach(indexTable -> indexMetadataRefs.get(Pair.create(indexTable.keyspace, indexTable.indexName().get())).set(indexTable));
 
         SchemaDiagnostics.metadataReloaded(this, previous, updated, tablesDiff, viewsDiff, indexesDiff);
+    }
+
+
+    /**
+     * Removes the {@link TableMetadataRef} from {@link #metadataRefs} and {@link #indexMetadataRefs} for the provided
+     * (dropped) keyspace.
+     */
+    void removeRefs(KeyspaceMetadata ksm)
+    {
+        ksm.tablesAndViews()
+           .forEach(t -> metadataRefs.remove(t.id));
+
+        ksm.tables
+        .indexTables()
+        .keySet()
+        .forEach(name -> indexMetadataRefs.remove(Pair.create(ksm.name, name)));
+
+        SchemaDiagnostics.metadataRemoved(this, ksm);
     }
 
     public void registerListener(SchemaChangeListener listener)
@@ -251,16 +309,7 @@ public final class SchemaManager
     synchronized void unload(KeyspaceMetadata ksm)
     {
         keyspaces = keyspaces.without(ksm.name);
-
-        ksm.tablesAndViews()
-           .forEach(t -> metadataRefs.remove(t.id));
-
-        ksm.tables
-           .indexTables()
-           .keySet()
-           .forEach(name -> indexMetadataRefs.remove(Pair.create(ksm.name, name)));
-
-        SchemaDiagnostics.metadataRemoved(this, ksm);
+        removeRefs(ksm);
     }
 
     /**
@@ -555,11 +604,27 @@ public final class SchemaManager
     }
 
     /**
-     * Checks whether the current schema is empty.
+     * Checks whether the current schema is empty, which is defined by having no keyspace defined <em>other than</em>
+     * the hard-coded <em>local</em> system ones. Note in particular that the schema is not considered empty as soon as
+     * non-local system keyspace are created, so an empty schema correspond to a brand new node that has not received
+     * any schema yet nor finished joining the ring (since distributed system keyspace are created then if not before).
      */
     public boolean isEmpty()
     {
-        return SchemaConstants.emptyVersion.equals(version);
+        return schema().isEmpty();
+    }
+
+    /**
+     * Whether the provided keyspace is the system keyspace used by this updater to store the local version of the
+     * schema (that is, the keyspace read by {@link #loadFromDisk()}) and {@link #tryReloadingSchemaFromDisk()}.
+     *
+     * @param keyspaceName the keyspace to check.
+     * @return {@code true} if {@code keyspace} is a schema system keyspace (for the active schema management
+     * handler).
+     */
+    public boolean isOnDiskSchemaKeyspace(String keyspaceName)
+    {
+        return updateHandler.isOnDiskSchemaKeyspace(keyspaceName);
     }
 
     /**
@@ -602,23 +667,116 @@ public final class SchemaManager
         SchemaDiagnostics.schemataCleared(this);
     }
 
-    /*
-     * Reload schema from local disk. Useful if a user made changes to schema tables by hand, or has suspicion that
-     * in-memory representation got out of sync somehow with what's on disk.
+    /**
+     * Reads the schema stored locally on disk, and replace the local view of the schema with that.
+     *
+     * @return a future on the completion of the reloading the schema from disk and applying any necessary changes.
      */
-    public synchronized void reloadSchemaAndAnnounceVersion()
+    public void tryReloadingSchemaFromDisk()
     {
-        Keyspaces before = keyspaces.filter(k -> !SchemaConstants.isLocalSystemKeyspace(k.name));
-        Keyspaces after = SchemaKeyspace.fetchNonSystemKeyspaces();
-        merge(KeyspacesDiff.diff(before, after));
-        updateVersionAndAnnounce();
+        updateHandler.tryReloadingSchemaFromDisk();
+    }
+
+    /**
+     * Apply the provided schema transformation to the current schema (if said transformation is valid).
+     *
+     * @param transformation the transformation to applySchemaMigration to the current schema.
+     * @return a future on the completion of the update. If the application is valid and successful (the schema has
+     * been applied, _at least_ locally), the future will complete with the result of the change made. Otherwise, the
+     * future will complete exceptionally.
+     */
+    public CompletableFuture<SchemaTransformation.Result> apply(SchemaTransformation transformation)
+    {
+        return apply(transformation, false);
+    }
+
+    /**
+     * Apply the provided schema transformation to the current schema, but without overriding any existing user
+     * settings.
+     *
+     * <p>See {@link SchemaUpdateHandler#apply} javadoc for why this exists. This should only be called for
+     * transformation on system distributed keyspaces (and only those have historically used the "trick" of having
+     * its mutation have a 0 timestamp).
+     *
+     * <p>Note: if DB-1177 is implemented, it should provide a more generic handling of this,  whose details can be
+     * easily encapsulated within the {@link SchemaUpdateHandler} implementations and this should go away.
+     *
+     * @param transformation the transformation to applySchemaMigration to the current schema.
+     * @return a future on the completion of the update. If the application is valid and successful (the schema has
+     * been applied, _at least_ locally), the future will complete with the result of the change made. Otherwise, the
+     * future will complete exceptionally.
+     */
+    public CompletableFuture<SchemaTransformation.Result> applyButPreserveExistingUserSettings(SchemaTransformation transformation)
+    {
+        return apply(transformation, true);
+    }
+
+    /**
+     * Equivalent to {@link #applyButPreserveExistingUserSettings(SchemaTransformation)} if
+     * {@code preserveExistingUserSettings == true} and {@link #apply(SchemaTransformation)} otherwise.
+     *
+     * <p>This exists because the {@code preserveExistingUserSettings} boolean is sometimes passed through chains of
+     * method calls before reaching this method and this is simpler to call in that case, but don't pass {@code true}
+     * or {@code false} directly here; prefer the more explicit methods in that case.
+     */
+    public CompletableFuture<SchemaTransformation.Result> apply(SchemaTransformation transformation,
+                                                                boolean preserveExistingUserSettings)
+    {
+        return updateHandler.apply(transformation, preserveExistingUserSettings);
+    }
+
+    /**
+     * If legacy schema handling is used, clears all locally stored schema information, reset schema to initial state,
+     * and force the local schema to that of another live node if any is available.
+     * <p>
+     * Called by user (via JMX) who wants to get rid of schema disagreement.
+     *
+     * @throws IllegalStateException if legacy schema handling is not in use.
+     */
+    public void resetLegacyLocalSchema()
+    {
+        SchemaUpdateHandler handler = updateHandler; // making sure we don't race with a change of handler
+        if (!(handler instanceof DefaultSchemaUpdateHandler))
+            throw new IllegalStateException(format("Resetting the local schema is not allowed with %s schema handling",
+                                                   handler.name()));
+
+        try
+        {
+            ((DefaultSchemaUpdateHandler) handler).resetLocalSchema().get();
+        }
+        catch (InterruptedException e)
+        {
+            throw new AssertionError();
+        }
+        catch (ExecutionException e)
+        {
+            throw new RuntimeException(e.getCause());
+        }
+    }
+
+    /**
+     * Method called back when we learn about a remote having a new schema version (or at least we suspect it may
+     * have; calling this method "uselessly" is inefficient (so don't overdo it) but otherwise harmless).
+     *
+     * @param remote the remote node having had a schema change.
+     * @param newSchemaVersionAsUUID the new version (as a UUID) of the remote.
+     * @param reason a message described why we call this method, for potential inclusion in message logged.
+     * @return a future on the action taken based on this new information. In particular, with concurrent schema, it
+     * is guarantee that once this future return successfully, the node has an active schema version at least as high
+     * than the provided one.
+     */
+    public CompletableFuture<Void> onUpdatedSchemaVersion(InetAddressAndPort remote,
+                                                          UUID newSchemaVersionAsUUID,
+                                                          String reason)
+    {
+        return updateHandler.onUpdatedSchemaVersion(remote, newSchemaVersionAsUUID, reason);
     }
 
     /**
      * Merge remote schema in form of mutations with local and mutate ks/cf metadata objects
      * (which also involves fs operations on add/drop ks/cf)
      *
-     * @param mutations the schema changes to apply
+     * @param mutations the schema changes to applySchemaMigration
      *
      * @throws ConfigurationException If one of metadata attributes has invalid value
      */
@@ -690,10 +848,10 @@ public final class SchemaManager
         // fetch the current state of schema for the affected keyspaces only
         Keyspaces before = keyspaces.filter(k -> affectedKeyspaces.contains(k.name));
 
-        // apply the schema mutations
+        // applySchemaMigration the schema mutations
         SchemaKeyspace.applyChanges(mutations);
 
-        // apply the schema mutations and fetch the new versions of the altered keyspaces
+        // applySchemaMigration the schema mutations and fetch the new versions of the altered keyspaces
         Keyspaces after = SchemaKeyspace.fetchKeyspaces(affectedKeyspaces);
 
         merge(KeyspacesDiff.diff(before, after));
@@ -922,19 +1080,5 @@ public final class SchemaManager
     private void notifyDropAggregate(UDAggregate udf)
     {
         changeListeners.forEach(l -> l.onDropAggregate(udf.name().keyspace, udf.name().name, udf.argTypes()));
-    }
-
-
-    /**
-     * Converts the given schema version to a string. Returns {@code unknown}, if {@code version} is {@code null}
-     * or {@code "(empty)"}, if {@code version} refers to an {@link SchemaConstants#emptyVersion empty) schema.
-     */
-    public static String schemaVersionToString(UUID version)
-    {
-        return version == null
-               ? "unknown"
-               : SchemaConstants.emptyVersion.equals(version)
-                 ? "(empty)"
-                 : version.toString();
     }
 }

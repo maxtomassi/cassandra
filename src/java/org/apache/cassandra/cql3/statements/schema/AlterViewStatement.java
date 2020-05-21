@@ -71,7 +71,7 @@ public final class AlterViewStatement extends AlterSchemaStatement
         }
 
         ViewMetadata newView = view.copy(view.metadata.withSwapped(params));
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.views.withSwapped(newView)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.views.withSwapped(newView)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

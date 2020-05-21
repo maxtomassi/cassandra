@@ -341,7 +341,7 @@ public class MigrationManagerTest
         String tableName = "added_later";
         TableMetadata newCf = addTestTable(EMPTY_KEYSPACE, tableName, "A new CF to add to an empty KS");
 
-        //should not exist until apply
+        //should not exist until applySchemaMigration
         assertFalse(SchemaManager.instance.getKeyspaceMetadata(newKs.name).tables.get(newCf.name).isPresent());
 
         //add the new CF to the empty space
@@ -450,7 +450,7 @@ public class MigrationManagerTest
         CFMetaData.copyOpts(newCfm, cf);
         try
         {
-            cf.apply(newCfm);
+            cf.applySchemaMigration(newCfm);
             throw new AssertionError("Should have blown up when you used a different id.");
         }
         catch (ConfigurationException expected) {}
@@ -460,7 +460,7 @@ public class MigrationManagerTest
         CFMetaData.copyOpts(newCfm, cf);
         try
         {
-            cf.apply(newCfm);
+            cf.applySchemaMigration(newCfm);
             throw new AssertionError("Should have blown up when you used a different name.");
         }
         catch (ConfigurationException expected) {}
@@ -470,7 +470,7 @@ public class MigrationManagerTest
         CFMetaData.copyOpts(newCfm, cf);
         try
         {
-            cf.apply(newCfm);
+            cf.applySchemaMigration(newCfm);
             throw new AssertionError("Should have blown up when you used a different keyspace.");
         }
         catch (ConfigurationException expected) {}
@@ -480,7 +480,7 @@ public class MigrationManagerTest
         CFMetaData.copyOpts(newCfm, cf);
         try
         {
-            cf.apply(newCfm);
+            cf.applySchemaMigration(newCfm);
             throw new AssertionError("Should have blwon up when you used a different cf type.");
         }
         catch (ConfigurationException expected) {}
@@ -490,7 +490,7 @@ public class MigrationManagerTest
         CFMetaData.copyOpts(newCfm, cf);
         try
         {
-            cf.apply(newCfm);
+            cf.applySchemaMigration(newCfm);
             throw new AssertionError("Should have blown up when you used a different comparator.");
         }
         catch (ConfigurationException expected) {}

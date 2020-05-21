@@ -18,6 +18,7 @@
 package org.apache.cassandra.cql3.statements.schema;
 
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import com.google.common.collect.ImmutableSet;
 
@@ -35,7 +36,7 @@ import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.messages.ResultMessage;
 
-abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformation
+abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformation, KeyspaceStatement
 {
     protected final String keyspaceName; // name of the keyspace affected by the statement
 
@@ -65,6 +66,12 @@ abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformatio
             throw ire("Keyspace '%s' doesn't exist", keyspaceName);
 
         return metadata;
+    }
+
+    @Override
+    public String keyspace()
+    {
+        return keyspaceName;
     }
 
     @Override
@@ -125,7 +132,8 @@ abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformatio
 
         validateKeyspaceName();
 
-        KeyspacesDiff diff = MigrationManager.announce(this, locally);
+        Result result = SchemaManager.instance.apply(this).join();
+        KeyspacesDiff diff = result.diff();
 
         clientWarnings(diff).forEach(ClientWarn.instance::warn);
 

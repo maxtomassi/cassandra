@@ -30,6 +30,7 @@ import javax.management.openmbean.TabularData;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
@@ -2169,6 +2170,11 @@ public class CompactionManager implements CompactionManagerMBean
                     compactionHolder.stop();
             }
         }
+    }
+
+    public void interruptCompactionFor(TableMetadata table, boolean interruptValidation)
+    {
+        interruptCompactionFor(Collections.singleton(table), Predicates.alwaysTrue(), true);
     }
 
     public void interruptCompactionForCFs(Iterable<ColumnFamilyStore> cfss, Predicate<SSTableReader> sstablePredicate, boolean interruptValidation)
