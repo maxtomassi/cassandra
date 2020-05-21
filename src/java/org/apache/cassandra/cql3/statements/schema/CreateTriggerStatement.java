@@ -77,7 +77,7 @@ public final class CreateTriggerStatement extends AlterSchemaStatement
         }
 
         TableMetadata newTable = table.withSwapped(table.triggers.with(TriggerMetadata.create(triggerName, triggerClass)));
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

@@ -39,10 +39,12 @@ import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.utils.concurrent.Refs;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 
 public class KeyCacheTest
@@ -60,14 +62,16 @@ public class KeyCacheTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY2),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY3),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY4),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY5),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY6));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY1).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY2).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY3).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY4).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY5).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, COLUMN_FAMILY6).build())
+        );
     }
 
     @AfterClass

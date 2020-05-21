@@ -54,7 +54,7 @@ public class TruncateStatement extends QualifiedStatement implements CQLStatemen
 
     public void validate(ClientState state) throws InvalidRequestException
     {
-        SchemaManager.instance.validateTable(keyspace(), name());
+        SchemaManager.instance.validateTableForUserQuery(keyspace(), name());
     }
 
     public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime) throws InvalidRequestException, TruncateException

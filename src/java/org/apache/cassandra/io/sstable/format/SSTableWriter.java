@@ -120,7 +120,7 @@ public abstract class SSTableWriter extends SSTable implements Transactional
                                        Collection<Index> indexes,
                                        LifecycleNewTracker lifecycleNewTracker)
     {
-        TableMetadataRef metadata = SchemaManager.instance.getTableMetadataRef(descriptor);
+        TableMetadataRef metadata = SchemaManager.instance.getTableMetadataRef(descriptor.ksname, descriptor.cfname);
         return create(metadata, descriptor, keyCount, repairedAt, pendingRepair, isTransient, sstableLevel, header, indexes, lifecycleNewTracker);
     }
 

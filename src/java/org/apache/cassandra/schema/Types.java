@@ -81,6 +81,11 @@ public final class Types implements Iterable<UserType>
         return builder().add(types).build();
     }
 
+    public boolean isEmpty()
+    {
+        return types.isEmpty();
+    }
+
     public Iterator<UserType> iterator()
     {
         return types.values().iterator();

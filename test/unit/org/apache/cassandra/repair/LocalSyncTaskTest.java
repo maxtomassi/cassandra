@@ -35,7 +35,6 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.locator.InetAddressAndPort;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.service.ActiveRepairService;
@@ -49,6 +48,9 @@ import org.apache.cassandra.utils.MerkleTree;
 import org.apache.cassandra.utils.MerkleTrees;
 import org.apache.cassandra.utils.UUIDGen;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.service.ActiveRepairService.NO_PENDING_REPAIR;
 
 import static org.junit.Assert.assertEquals;
@@ -67,9 +69,11 @@ public class LocalSyncTaskTest extends AbstractRepairTest
     public static void defineSchema()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD).build())
+        );
 
         TableId tid = SchemaManager.instance.getTableMetadata(KEYSPACE1, CF_STANDARD).id;
         cfs = SchemaManager.instance.getColumnFamilyStoreInstance(tid);

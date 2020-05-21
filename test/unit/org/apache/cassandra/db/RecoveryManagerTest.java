@@ -57,11 +57,13 @@ import org.apache.cassandra.io.compress.LZ4Compressor;
 import org.apache.cassandra.io.compress.SnappyCompressor;
 import org.apache.cassandra.io.compress.ZstdCompressor;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.security.EncryptionContext;
 import org.apache.cassandra.security.EncryptionContextGenerator;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(Parameterized.class)
@@ -105,14 +107,16 @@ public class RecoveryManagerTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1),
-                                    SchemaLoader.counterCFMD(KEYSPACE1, CF_COUNTER1),
-                                    SchemaLoader.staticCFMD(KEYSPACE1, CF_STATIC1));
-        SchemaLoader.createKeyspace(KEYSPACE2,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD3));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build()),
+            createTable(SchemaLoader.counterCFMD(KEYSPACE1, CF_COUNTER1).build()),
+            createTable(SchemaLoader.staticCFMD(KEYSPACE1, CF_STATIC1).build()),
+
+            createKeyspace(KEYSPACE2),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD3).build())
+        );
     }
 
     @Before

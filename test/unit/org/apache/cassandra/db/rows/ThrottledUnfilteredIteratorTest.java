@@ -19,6 +19,7 @@
 package org.apache.cassandra.db.rows;
 
 import static org.apache.cassandra.SchemaLoader.standardCFMD;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.junit.Assert.*;
 
 import java.nio.ByteBuffer;
@@ -36,6 +37,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.UpdateBuilder;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.cql3.CQLTester;
@@ -61,7 +63,7 @@ import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.CloseableIterator;
@@ -76,9 +78,11 @@ public class ThrottledUnfilteredIteratorTest extends CQLTester
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KSNAME,
-                                    KeyspaceParams.simple(1),
-                                    standardCFMD(KSNAME, CFNAME, 1, UTF8Type.instance, Int32Type.instance, Int32Type.instance));
+
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KSNAME),
+            SchemaTransformations.createTable(standardCFMD(KSNAME, CFNAME, 1, UTF8Type.instance, Int32Type.instance, Int32Type.instance).build())
+        );
     }
 
     static final TableMetadata metadata;

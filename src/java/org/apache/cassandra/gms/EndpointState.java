@@ -63,6 +63,11 @@ public class EndpointState
         isAlive = true;
     }
 
+    public boolean has(ApplicationState state)
+    {
+        return applicationState.get().containsKey(state);
+    }
+
     HeartBeatState getHeartBeatState()
     {
         return hbState;

@@ -18,6 +18,8 @@
 package org.apache.cassandra.hints;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import com.google.common.collect.ImmutableList;
@@ -27,6 +29,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.config.*;
 import org.apache.cassandra.db.*;
@@ -43,20 +46,23 @@ import org.apache.cassandra.metrics.StorageMetrics;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
+import org.apache.cassandra.schema.SchemaTransformation;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.service.StorageProxy;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.FBUtilities;
 
 import static junit.framework.Assert.*;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.SchemaTestUtils.updateGCGrace;
 import static org.apache.cassandra.Util.dk;
 import static org.apache.cassandra.hints.HintsTestUtil.assertHintsEqual;
 import static org.apache.cassandra.hints.HintsTestUtil.assertPartitionsEqual;
 import static org.apache.cassandra.net.Verb.HINT_REQ;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class HintTest
 {
@@ -69,11 +75,13 @@ public class HintTest
     public static void defineSchema()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, TABLE0),
-                                    SchemaLoader.standardCFMD(KEYSPACE, TABLE1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, TABLE2));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE0).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE1).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE2).build())
+        );
     }
 
     @Before
@@ -85,8 +93,11 @@ public class HintTest
         tokenMeta.updateHostId(UUID.randomUUID(), local);
         tokenMeta.updateNormalTokens(BootStrapper.getRandomTokens(tokenMeta, 1), local);
 
+        List<SchemaTransformation> changes = new ArrayList<>();
         for (TableMetadata table : SchemaManager.instance.getTablesAndViews(KEYSPACE))
-            MigrationManager.announceTableUpdate(table.unbuild().gcGraceSeconds(864000).build(), true);
+            changes.add(updateGCGrace(table, 864000));
+
+        doSchemaChanges(changes);
     }
 
     @Test
@@ -170,13 +181,8 @@ public class HintTest
         assertNoPartitions(key, TABLE2);
 
         // lower the GC GS on TABLE0 to 0 BEFORE the hint is created
-        TableMetadata updated =
-            SchemaManager.instance
-                  .getTableMetadata(KEYSPACE, TABLE0)
-                  .unbuild()
-                  .gcGraceSeconds(0)
-                  .build();
-        MigrationManager.announceTableUpdate(updated, true);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(KEYSPACE, TABLE0);
+        SchemaTestUtils.doSchemaChanges(SchemaTestUtils.updateGCGrace(table, 0));
 
         Mutation mutation = createMutation(key, now);
         Hint.create(mutation, now / 1000).apply();
@@ -199,13 +205,8 @@ public class HintTest
         assertNoPartitions(key, TABLE2);
 
         // lower the GC GS on TABLE0 AFTER the hint is already created
-        TableMetadata updated =
-            SchemaManager.instance
-                  .getTableMetadata(KEYSPACE, TABLE0)
-                  .unbuild()
-                  .gcGraceSeconds(0)
-                  .build();
-        MigrationManager.announceTableUpdate(updated, true);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(KEYSPACE, TABLE0);
+        SchemaTestUtils.doSchemaChanges(SchemaTestUtils.updateGCGrace(table, 0));
 
         Mutation mutation = createMutation(key, now);
         Hint hint = Hint.create(mutation, now / 1000);

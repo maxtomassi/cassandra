@@ -17,6 +17,9 @@
  */
 package org.apache.cassandra.dht;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -207,7 +210,11 @@ public class BootStrapperTest
             metadata.updateHostId(UUID.randomUUID(), InetAddressAndPort.getByName("127.1.0.99"));
             metadata.updateHostId(UUID.randomUUID(), InetAddressAndPort.getByName("127.15.0.99"));
 
-            SchemaLoader.createKeyspace(ks, KeyspaceParams.nts(dc, replicas, "15", 15), SchemaLoader.standardCFMD(ks, "Standard1"));
+            doSchemaChanges(
+                createKeyspace(ks, KeyspaceParams.nts(dc, replicas, "15", 15)),
+                createTable(SchemaLoader.standardCFMD(ks, "Standard1").build())
+            );
+
             TokenMetadata tm = StorageService.instance.getTokenMetadata();
             tm.clearUnsafe();
             for (int i = 0; i < rackCount; ++i)
@@ -294,7 +301,12 @@ public class BootStrapperTest
             metadata.updateHostId(UUID.randomUUID(), InetAddressAndPort.getByName("127.1.0.99"));
             metadata.updateHostId(UUID.randomUUID(), InetAddressAndPort.getByName("127.15.0.99"));
 
-            SchemaLoader.createKeyspace(ks, KeyspaceParams.nts(dc, replicas, "15", 15), SchemaLoader.standardCFMD(ks, "Standard1"));
+            doSchemaChanges(
+                createKeyspace(ks, KeyspaceParams.nts(dc, replicas, "15", 15)),
+                createTable(SchemaLoader.standardCFMD(ks, "Standard1").build())
+            );
+
+
             int base = 5;
             for (int i = 0; i < rackCount; ++i)
                 generateFakeEndpoints(metadata, base << i, vn, dc, Integer.toString(i));     // unbalanced racks

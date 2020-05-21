@@ -52,10 +52,11 @@ import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
-import static org.apache.cassandra.locator.Replica.fullReplica;
-import static org.apache.cassandra.locator.Replica.transientReplica;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.locator.ReplicaUtils.full;
 import static org.apache.cassandra.locator.ReplicaUtils.trans;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class WriteResponseHandlerTransientTest
 {
@@ -140,7 +141,12 @@ public class WriteResponseHandlerTransientTest
         });
 
         DatabaseDescriptor.setBroadcastAddress(InetAddress.getByName("127.1.0.1"));
-        SchemaLoader.createKeyspace("ks", KeyspaceParams.nts(DC1, "3/1", DC2, "3/1"), SchemaLoader.standardCFMD("ks", "tbl"));
+
+        doSchemaChanges(
+            createKeyspace("ks", KeyspaceParams.nts(DC1, "3/1", DC2, "3/1")),
+            createTable(SchemaLoader.standardCFMD("ks", "tbl").build())
+        );
+
         ks = Keyspace.open("ks");
         cfs = ks.getColumnFamilyStore("tbl");
         dummy = DatabaseDescriptor.getPartitioner().getToken(ByteBufferUtil.bytes(0));

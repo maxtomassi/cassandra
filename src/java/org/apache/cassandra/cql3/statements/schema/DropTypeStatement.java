@@ -110,7 +110,7 @@ public final class DropTypeStatement extends AlterSchemaStatement
                       join(", ", transform(tables, t -> t.name)));
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.types.without(type)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.types.without(type)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

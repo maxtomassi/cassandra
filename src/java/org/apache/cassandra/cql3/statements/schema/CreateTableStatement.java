@@ -41,7 +41,7 @@ import static java.util.Comparator.comparing;
 
 import static com.google.common.collect.Iterables.concat;
 
-public final class CreateTableStatement extends AlterSchemaStatement
+public final class CreateTableStatement extends AlterSchemaStatement implements TableStatement
 {
     private final String tableName;
 
@@ -82,6 +82,11 @@ public final class CreateTableStatement extends AlterSchemaStatement
         this.ifNotExists = ifNotExists;
     }
 
+    public boolean hasIfNotExists()
+    {
+        return ifNotExists;
+    }
+
     public Keyspaces apply(Keyspaces schema)
     {
         KeyspaceMetadata keyspace = schema.getNullable(keyspaceName);
@@ -105,7 +110,7 @@ public final class CreateTableStatement extends AlterSchemaStatement
             throw ire("read_repair must be set to 'NONE' for transiently replicated keyspaces");
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.with(table)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.with(table)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
@@ -116,6 +121,12 @@ public final class CreateTableStatement extends AlterSchemaStatement
     public void authorize(ClientState client)
     {
         client.ensureKeyspacePermission(keyspaceName, Permission.CREATE);
+    }
+
+    @Override
+    public String table()
+    {
+        return tableName;
     }
 
     @Override
@@ -273,10 +284,14 @@ public final class CreateTableStatement extends AlterSchemaStatement
 
     public static TableMetadata.Builder parse(String cql, String keyspace)
     {
+        return parseStatement(cql, keyspace).builder(Types.none());
+    }
+
+    public static CreateTableStatement parseStatement(String cql, String keyspace)
+    {
         return CQLFragmentParser.parseAny(CqlParser::createTableStatement, cql, "CREATE TABLE")
                                 .keyspace(keyspace)
-                                .prepare(null) // works around a messy ClientState/QueryProcessor class init deadlock
-                                .builder(Types.none());
+                                .prepare(null);
     }
 
     public final static class Raw extends CQLStatement.Raw

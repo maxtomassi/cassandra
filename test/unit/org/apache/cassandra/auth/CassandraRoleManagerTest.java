@@ -18,17 +18,25 @@
 
 package org.apache.cassandra.auth;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
+import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaConstants;
+import org.apache.cassandra.schema.SchemaTransformation;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.schema.TableMetadata;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.auth.RoleTestUtils.*;
 import static org.junit.Assert.assertEquals;
 
@@ -40,9 +48,15 @@ public class CassandraRoleManagerTest
     {
         SchemaLoader.prepareServer();
         // create the system_auth keyspace so the IRoleManager can function as normal
-        SchemaLoader.createKeyspace(SchemaConstants.AUTH_KEYSPACE_NAME,
-                                    KeyspaceParams.simple(1),
-                                    Iterables.toArray(AuthKeyspace.metadata().tables, TableMetadata.class));
+        List<SchemaTransformation> transformations = Lists.newArrayList();
+        transformations.add(SchemaTestUtils.createKeyspace(SchemaConstants.AUTH_KEYSPACE_NAME));
+
+        for (TableMetadata table: AuthKeyspace.metadata().tables)
+        {
+            transformations.add(SchemaTransformations.createTable(table));
+        }
+
+        doSchemaChanges(transformations);
     }
 
     @Test

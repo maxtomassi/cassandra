@@ -890,6 +890,18 @@ public final class TableMetadata
             return this;
         }
 
+        public Builder addIndex(IndexMetadata index)
+        {
+            indexes = indexes.with(index);
+            return this;
+        }
+
+        public Builder removeIndex(String indexName)
+        {
+            indexes = indexes.without(indexName);
+            return this;
+        }
+
         public Builder addPartitionKeyColumn(String name, AbstractType type)
         {
             return addPartitionKeyColumn(ColumnIdentifier.getInterned(name, false), type);

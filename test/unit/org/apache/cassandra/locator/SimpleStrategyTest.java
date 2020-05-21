@@ -47,11 +47,12 @@ import org.apache.cassandra.dht.OrderPreservingPartitioner.StringToken;
 import org.apache.cassandra.dht.RandomPartitioner.BigIntegerToken;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.PendingRangeCalculatorService;
 import org.apache.cassandra.service.StorageServiceAccessor;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -65,8 +66,12 @@ public class SimpleStrategyTest
     public static void defineSchema()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1));
-        SchemaLoader.createKeyspace(MULTIDC, KeyspaceParams.simple(3));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createKeyspace(MULTIDC, 3)
+        );
+
         DatabaseDescriptor.setTransientReplicationEnabledUnsafe(true);
     }
 

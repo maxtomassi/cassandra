@@ -62,7 +62,7 @@ public abstract class AlterTableStatement extends AlterSchemaStatement
         if (table.isView())
             throw ire("Cannot use ALTER TABLE on a materialized view; use ALTER MATERIALIZED VIEW instead");
 
-        return schema.withAddedOrUpdated(apply(keyspace, table));
+        return schema.withAddedOrReplaced(apply(keyspace, table));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

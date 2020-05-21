@@ -17,6 +17,9 @@
  */
 package org.apache.cassandra.db.compaction;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 import java.util.*;
@@ -40,7 +43,6 @@ import org.apache.cassandra.db.partitions.AbstractUnfilteredPartitionIterator;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadata;
 
 public class CompactionIteratorTest
@@ -64,14 +66,18 @@ public class CompactionIteratorTest
         kk = Util.dk("key");
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KSNAME,
-                                    KeyspaceParams.simple(1),
-                                    metadata = SchemaLoader.standardCFMD(KSNAME,
-                                                                         CFNAME,
-                                                                         1,
-                                                                         UTF8Type.instance,
-                                                                         Int32Type.instance,
-                                                                         Int32Type.instance).build());
+
+        metadata = SchemaLoader.standardCFMD(KSNAME,
+                                             CFNAME,
+                                             1,
+                                             UTF8Type.instance,
+                                             Int32Type.instance,
+                                             Int32Type.instance).build();
+
+        doSchemaChanges(
+            createKeyspace(KSNAME),
+            createTable(metadata)
+        );
     }
 
     // See org.apache.cassandra.db.rows.UnfilteredRowsGenerator.parse for the syntax used in these tests.

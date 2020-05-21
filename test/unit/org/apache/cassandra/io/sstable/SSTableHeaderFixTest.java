@@ -741,7 +741,7 @@ public class SSTableHeaderFixTest
     {
         updatedColumns.clear();
         return SSTableHeaderFix.builder()
-                               .schemaCallback(() -> (desc) -> tableMetadata)
+                               .schemaCallback((desc) -> tableMetadata)
                                .info(ln -> {
                                    System.out.println("INFO: " + ln);
                                    Matcher m = p.matcher(ln);

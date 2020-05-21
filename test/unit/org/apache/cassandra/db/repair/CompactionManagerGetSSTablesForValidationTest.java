@@ -49,7 +49,10 @@ import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.db.repair.CassandraValidationIterator.getSSTablesToValidate;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 /**
  * Tests correct sstables are returned from CompactionManager.getSSTablesForValidation
@@ -84,7 +87,12 @@ public class CompactionManagerGetSSTablesForValidationTest
     {
         ks = "ks_" + System.currentTimeMillis();
         TableMetadata cfm = CreateTableStatement.parse(String.format("CREATE TABLE %s.%s (k INT PRIMARY KEY, v INT)", ks, tbl), ks).build();
-        SchemaLoader.createKeyspace(ks, KeyspaceParams.simple(1), cfm);
+
+        doSchemaChanges(
+            createKeyspace(ks),
+            createTable(cfm)
+        );
+        
         cfs = SchemaManager.instance.getColumnFamilyStoreInstance(cfm.id);
     }
 

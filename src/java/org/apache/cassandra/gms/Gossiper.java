@@ -17,6 +17,7 @@
  */
 package org.apache.cassandra.gms;
 
+import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.Map.Entry;
@@ -352,6 +353,14 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     public void unregister(IEndpointStateChangeSubscriber subscriber)
     {
         subscribers.remove(subscriber);
+    }
+
+    /**
+     * Retrieves all endpoints - local endpoint, live endpoints and unreachable endpoints.
+     */
+    public Iterable<InetAddressAndPort> getAllEndpoints()
+    {
+        return Iterables.concat(Collections.singleton(FBUtilities.getBroadcastAddressAndPort()), liveEndpoints, unreachableEndpoints.keySet());
     }
 
     /**

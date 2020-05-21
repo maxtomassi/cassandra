@@ -59,11 +59,13 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.notifications.SSTableAddedNotification;
 import org.apache.cassandra.notifications.SSTableDeletingNotification;
 import org.apache.cassandra.schema.CompactionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.UUIDGen;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -92,10 +94,13 @@ public class CompactionStrategyManagerTest
          * disk assignment based on its generation - See {@link this#getSSTableIndex(Integer[], SSTableReader)}
          */
         originalPartitioner = StorageService.instance.setPartitionerUnsafe(ByteOrderedPartitioner.instance);
-        SchemaLoader.createKeyspace(KS_PREFIX,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KS_PREFIX, TABLE_PREFIX)
-                                                .compaction(CompactionParams.stcs(Collections.emptyMap())));
+
+        doSchemaChanges(
+            createKeyspace(KS_PREFIX),
+            createTable(SchemaLoader.standardCFMD(KS_PREFIX, TABLE_PREFIX)
+                                    .compaction(CompactionParams.stcs(Collections.emptyMap()))
+                                    .build())
+        );
     }
 
     @Before

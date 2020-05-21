@@ -185,7 +185,7 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
     {
         // we do not use method reference syntax here, because we need to sync on the node-local schema instance
         //noinspection Convert2MethodRef
-        return SchemaManager.instance.getVersion();
+        return SchemaManager.instance.getVersionAsUUID();
     }
 
     public void startup()

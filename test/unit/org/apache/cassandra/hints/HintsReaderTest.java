@@ -36,14 +36,16 @@ import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.Util.dk;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
+import static org.apache.cassandra.schema.SchemaTransformations.dropTable;
 import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
 
 public class HintsReaderTest
@@ -133,10 +135,13 @@ public class HintsReaderTest
     public void testNormalRead() throws IOException
     {
         String ks = "testNormalRead";
-        SchemaLoader.createKeyspace(ks,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(ks, CF_STANDARD1),
-                                    SchemaLoader.standardCFMD(ks, CF_STANDARD2));
+
+        doSchemaChanges(
+            createKeyspace(ks),
+            createTable(SchemaLoader.standardCFMD(ks, CF_STANDARD1).build()),
+            createTable(SchemaLoader.standardCFMD(ks, CF_STANDARD2).build())
+        );
+
         int numTable = 2;
         directory = Files.createTempDirectory(null).toFile();
         try
@@ -154,16 +159,18 @@ public class HintsReaderTest
     public void testDroppedTableRead() throws IOException
     {
         String ks = "testDroppedTableRead";
-        SchemaLoader.createKeyspace(ks,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(ks, CF_STANDARD1),
-                                    SchemaLoader.standardCFMD(ks, CF_STANDARD2));
+
+        doSchemaChanges(
+            createKeyspace(ks),
+            createTable(SchemaLoader.standardCFMD(ks, CF_STANDARD1).build()),
+            createTable(SchemaLoader.standardCFMD(ks, CF_STANDARD2).build())
+        );
 
         directory = Files.createTempDirectory(null).toFile();
         try
         {
             generateHints(3, ks);
-            MigrationManager.announceTableDrop(ks, CF_STANDARD1, true);
+            doSchemaChanges(dropTable(ks, CF_STANDARD1));
             readHints(3, 1);
         }
         finally

@@ -123,7 +123,7 @@ public final class CreateFunctionStatement extends AbstractCreateFunctionStateme
             // TODO: update dependent aggregates
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.functions.withAddedOrUpdated(function)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.functions.withAddedOrUpdated(function)));
     }
 
     @Override

@@ -104,7 +104,7 @@ public final class SchemaEvent extends DiagnosticEvent
         this.nonSystemKeyspaces = new ArrayList<>(schemaManager.getNonLocalSystemKeyspaces());
         this.userKeyspaces = new ArrayList<>(schemaManager.getUserKeyspaces());
         this.numberOfTables = schemaManager.getNumberOfTables();
-        this.version = schemaManager.getVersion();
+        this.version = schemaManager.getVersionAsUUID();
 
         Map<Pair<String, String>, TableMetadataRef> indexTableMetadataRefs = schemaManager.getIndexTableMetadataRefs();
         Map<String, String> indexTables = indexTableMetadataRefs.entrySet().stream()

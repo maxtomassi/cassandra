@@ -505,25 +505,20 @@ public class CQLSSTableWriter implements Closeable
 
                 String keyspaceName = schemaStatement.keyspace();
 
-                if (SchemaManager.instance.getKeyspaceMetadata(keyspaceName) == null)
-                {
-                    SchemaManager.instance.load(KeyspaceMetadata.create(keyspaceName,
-                                                                        KeyspaceParams.simple(1),
-                                                                        Tables.none(),
-                                                                        Views.none(),
-                                                                        Types.none(),
-                                                                        Functions.none()));
-                }
+                // Create keyspace, types and tables if necessary (all of which might be already created if multiple
+                // instances of CQLSSTableWriter are running in the same JVM, courtesy of static singletons).
+                // TODO: note that if any of those do exists, we're implicitly assuming here that their schema will be
+                //  compatible with what is passed to this CQLSStableWriter instance. We could try to validate it
+                //  though to prevent hard-to-find user (admittedly unlikely) mistakes.
+                KeyspaceMetadata ksToCreate = KeyspaceMetadata.create(keyspaceName, KeyspaceParams.simple(1));
+                SchemaManager.instance.apply(SchemaTransformations.createKeyspaceIfNotExists(ksToCreate));
 
-                KeyspaceMetadata ksm = SchemaManager.instance.getKeyspaceMetadata(keyspaceName);
+                Types typesToCreate = createTypes(keyspaceName);
+                SchemaManager.instance.apply(SchemaTransformations.createTypesIfNotExists(typesToCreate));
 
-                TableMetadata tableMetadata = ksm.tables.getNullable(schemaStatement.table());
-                if (tableMetadata == null)
-                {
-                    Types types = createTypes(keyspaceName);
-                    tableMetadata = createTable(types);
-                    SchemaManager.instance.load(ksm.withSwapped(ksm.tables.with(tableMetadata)).withSwapped(types));
-                }
+                TableMetadata tableMetadata = createTable(typesToCreate);
+                SchemaManager.instance.apply(SchemaTransformations.createTableIfNotExists(tableMetadata));
+
 
                 UpdateStatement preparedInsert = prepareInsert();
 

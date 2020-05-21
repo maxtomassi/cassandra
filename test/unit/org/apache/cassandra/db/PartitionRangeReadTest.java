@@ -26,6 +26,9 @@ import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -36,7 +39,6 @@ import org.apache.cassandra.db.marshal.IntegerType;
 import org.apache.cassandra.db.partitions.*;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
@@ -52,19 +54,22 @@ public class PartitionRangeReadTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1),
-                                    SchemaLoader.denseCFMD(KEYSPACE1, CF_STANDARDINT, IntegerType.instance),
-                                    TableMetadata.builder(KEYSPACE1, CF_COMPACT1)
-                                                 .isCompound(false)
-                                                 .addPartitionKeyColumn("key", AsciiType.instance)
-                                                 .addClusteringColumn("column1", AsciiType.instance)
-                                                 .addRegularColumn("value", AsciiType.instance)
-                                                 .addStaticColumn("val", AsciiType.instance));
-        SchemaLoader.createKeyspace(KEYSPACE2,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD1));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build()),
+            createTable(SchemaLoader.denseCFMD(KEYSPACE1, CF_STANDARDINT, IntegerType.instance).build()),
+            createTable(TableMetadata.builder(KEYSPACE1, CF_COMPACT1)
+                                     .isCompound(false)
+                                     .addPartitionKeyColumn("key", AsciiType.instance)
+                                     .addClusteringColumn("column1", AsciiType.instance)
+                                     .addRegularColumn("value", AsciiType.instance)
+                                     .addStaticColumn("val", AsciiType.instance)
+                                     .build()),
+
+            createKeyspace(KEYSPACE2),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD1).build())
+        );
     }
 
     @Test

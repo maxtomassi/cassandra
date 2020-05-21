@@ -63,7 +63,7 @@ public final class DropTriggerStatement extends AlterSchemaStatement
         }
 
         TableMetadata newTable = table.withSwapped(table.triggers.without(triggerName));
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

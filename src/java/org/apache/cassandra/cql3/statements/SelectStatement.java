@@ -950,7 +950,7 @@ public class SelectStatement implements CQLStatement
 
         public SelectStatement prepare(boolean forView) throws InvalidRequestException
         {
-            TableMetadata table = SchemaManager.instance.validateTable(keyspace(), name());
+            TableMetadata table = SchemaManager.instance.validateTableForUserQuery(keyspace(), name());
 
             List<Selectable> selectables = RawSelector.toSelectables(selectClause, table);
             boolean containsOnlyStaticColumns = selectOnlyStaticColumns(table, selectables);

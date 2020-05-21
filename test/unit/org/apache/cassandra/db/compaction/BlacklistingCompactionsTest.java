@@ -32,6 +32,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -78,10 +81,12 @@ public class BlacklistingCompactionsTest
         random = new Random(seed);
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    makeTable(STANDARD_STCS).compaction(CompactionParams.DEFAULT),
-                                    makeTable(STANDARD_LCS).compaction(CompactionParams.lcs(Collections.emptyMap())));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(makeTable(STANDARD_STCS).compaction(CompactionParams.DEFAULT).build()),
+            createTable(makeTable(STANDARD_LCS).compaction(CompactionParams.lcs(Collections.emptyMap())).build())
+        );
 
         maxValueSize = DatabaseDescriptor.getMaxValueSize();
         DatabaseDescriptor.setMaxValueSize(1024 * 1024);

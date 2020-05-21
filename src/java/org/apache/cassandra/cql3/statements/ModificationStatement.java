@@ -877,7 +877,7 @@ public abstract class ModificationStatement implements CQLStatement
 
         public ModificationStatement prepare(VariableSpecifications bindVariables)
         {
-            TableMetadata metadata = SchemaManager.instance.validateTable(keyspace(), name());
+            TableMetadata metadata = SchemaManager.instance.validateTableForUserQuery(keyspace(), name());
 
             Attributes preparedAttributes = attrs.prepare(keyspace(), name());
             preparedAttributes.collectMarkerSpecification(bindVariables);

@@ -26,14 +26,16 @@ import java.util.*;
 import com.google.common.collect.ImmutableMap;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.db.Mutation;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.utils.FBUtilities;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static junit.framework.Assert.*;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.Util.dk;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class HintsCatalogTest
 {
@@ -47,11 +49,13 @@ public class HintsCatalogTest
     public static void defineSchema()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                KeyspaceParams.simple(1),
-                SchemaLoader.standardCFMD(KEYSPACE, TABLE0),
-                SchemaLoader.standardCFMD(KEYSPACE, TABLE1),
-                SchemaLoader.standardCFMD(KEYSPACE, TABLE2));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE0).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE1).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE2).build())
+        );
     }
 
     @Test

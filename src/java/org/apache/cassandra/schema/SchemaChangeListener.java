@@ -33,6 +33,7 @@ public interface SchemaChangeListener
 
     default void onCreateView(ViewMetadata view)
     {
+        onCreateTable(view.metadata);
     }
 
     default void onCreateType(UserType type)
@@ -57,6 +58,7 @@ public interface SchemaChangeListener
 
     default void onAlterView(ViewMetadata before, ViewMetadata after)
     {
+        onAlterTable(before.metadata, after.metadata);
     }
 
     default void onAlterType(UserType before, UserType after)
@@ -81,6 +83,7 @@ public interface SchemaChangeListener
 
     default void onDropView(ViewMetadata view)
     {
+        onDropTable(view.metadata);
     }
 
     default void onDropType(UserType type)

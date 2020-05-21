@@ -308,7 +308,7 @@ public final class CreateViewStatement extends AlterSchemaStatement
         ViewMetadata view = new ViewMetadata(table.id, table.name, rawColumns.isEmpty(), whereClause, builder.build());
         view.metadata.validate();
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.views.with(view)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.views.with(view)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

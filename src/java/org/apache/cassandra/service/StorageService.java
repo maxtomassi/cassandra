@@ -88,7 +88,6 @@ import org.apache.cassandra.repair.*;
 import org.apache.cassandra.repair.messages.RepairOption;
 import org.apache.cassandra.schema.CompactionParams.TombstoneOption;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.schema.ReplicationParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
@@ -120,7 +119,6 @@ import static org.apache.cassandra.index.SecondaryIndexManager.getIndexName;
 import static org.apache.cassandra.index.SecondaryIndexManager.isIndexColumnFamily;
 import static org.apache.cassandra.net.NoPayload.noPayload;
 import static org.apache.cassandra.net.Verb.REPLICATION_DONE_REQ;
-import static org.apache.cassandra.schema.MigrationManager.evolveSystemKeyspace;
 
 /**
  * This abstraction contains the token/identifier of this node
@@ -822,6 +820,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             appStates.put(ApplicationState.RPC_ADDRESS, valueFactory.rpcaddress(FBUtilities.getJustBroadcastNativeAddress()));
             appStates.put(ApplicationState.RELEASE_VERSION, valueFactory.releaseVersion());
 
+            SchemaManager.instance.addSchemaStaticInfoForGossiper(appStates);
+
             // load the persisted ring state. This used to be done earlier in the init process,
             // but now we always perform a shadow round when preparing to join and we have to
             // clear endpoint states after doing that.
@@ -833,8 +833,6 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             gossipActive = true;
             // gossip snitch infos (local DC and rack)
             gossipSnitchInfo();
-            // gossip Schema.emptyVersion forcing immediate check for schema updates (see MigrationManager#maybeScheduleSchemaPull)
-            SchemaManager.instance.updateVersionAndAnnounce(); // Ensure we know our own actual Schema UUID in preparation for updates
             LoadBroadcaster.instance.startBroadcasting();
             HintsService.instance.startDispatch();
             BatchlogManager.instance.start();
@@ -849,7 +847,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             // if we see schema, we can proceed to the next check directly
             if (!SchemaManager.instance.isEmpty())
             {
-                logger.debug("current schema version: {}", SchemaManager.instance.getVersion());
+                logger.debug("current schema version: {}", SchemaManager.instance.getVersionAsUUID());
                 break;
             }
             Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
@@ -857,10 +855,10 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         // if our schema hasn't matched yet, wait until it has
         // we do this by waiting for all in-flight migration requests and responses to complete
         // (post CASSANDRA-1391 we don't expect this to be necessary very often, but it doesn't hurt to be careful)
-        if (!MigrationManager.isReadyForBootstrap())
+        if (!SchemaManager.instance.isReadyForBootstrap())
         {
             setMode(Mode.JOINING, "waiting for schema information to complete", true);
-            MigrationManager.waitUntilReadyForBootstrap();
+            SchemaManager.instance.waitUntilReadyForBootstrap();
         }
     }
 
@@ -1030,7 +1028,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     @VisibleForTesting
     public void ensureTraceKeyspace()
     {
-        evolveSystemKeyspace(TraceKeyspace.metadata(), TraceKeyspace.GENERATION).ifPresent(MigrationManager::announce);
+        SchemaManager.instance.evolveSystemKeyspace(TraceKeyspace.metadata(), TraceKeyspace.GENERATION);
     }
 
     public static boolean isReplacingSameAddress()
@@ -1115,7 +1113,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         if (!authSetupCalled.getAndSet(true))
         {
             if (setUpSchema)
-                evolveSystemKeyspace(AuthKeyspace.metadata(), AuthKeyspace.GENERATION).ifPresent(MigrationManager::announce);
+                SchemaManager.instance.evolveSystemKeyspace(AuthKeyspace.metadata(), AuthKeyspace.GENERATION);
 
             DatabaseDescriptor.getRoleManager().setup();
             DatabaseDescriptor.getAuthenticator().setup();
@@ -1133,14 +1131,14 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     private void setUpDistributedSystemKeyspaces()
     {
-        Collection<Mutation> changes = new ArrayList<>(3);
+        SchemaManager.instance.evolveSystemKeyspace(TraceKeyspace.metadata(),
+                                                    TraceKeyspace.GENERATION);
 
-        evolveSystemKeyspace(            TraceKeyspace.metadata(),             TraceKeyspace.GENERATION).ifPresent(changes::add);
-        evolveSystemKeyspace(SystemDistributedKeyspace.metadata(), SystemDistributedKeyspace.GENERATION).ifPresent(changes::add);
-        evolveSystemKeyspace(             AuthKeyspace.metadata(),              AuthKeyspace.GENERATION).ifPresent(changes::add);
+        SchemaManager.instance.evolveSystemKeyspace(SystemDistributedKeyspace.metadata(),
+                                                    SystemDistributedKeyspace.GENERATION);
 
-        if (!changes.isEmpty())
-            MigrationManager.announce(changes);
+        SchemaManager.instance.evolveSystemKeyspace(AuthKeyspace.metadata(),
+                                                    AuthKeyspace.GENERATION);
     }
 
     public boolean isJoined()
@@ -2122,7 +2120,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                         break;
                     case SCHEMA:
                         SystemKeyspace.updatePeerInfo(endpoint, "schema_version", UUID.fromString(value.value));
-                        MigrationManager.instance.scheduleSchemaPull(endpoint, epState);
+                        String reason = String.format("gossip schema version change to %s", value.value);
+                        SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), reason);
                         break;
                     case HOST_ID:
                         SystemKeyspace.updatePeerInfo(endpoint, "host_id", UUID.fromString(value.value));
@@ -3014,12 +3013,15 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         {
             onChange(endpoint, entry.getKey(), entry.getValue());
         }
-        MigrationManager.instance.scheduleSchemaPull(endpoint, epState);
+
+        if (epState.has(ApplicationState.SCHEMA))
+            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), "endpoint joined");
     }
 
     public void onAlive(InetAddressAndPort endpoint, EndpointState state)
     {
-        MigrationManager.instance.scheduleSchemaPull(endpoint, state);
+        if (state.has(ApplicationState.SCHEMA))
+            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, state.getSchemaVersion(), "endpoint alive");
 
         if (tokenMetadata.isMember(endpoint))
             notifyUp(endpoint);
@@ -3132,7 +3134,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
     public String getSchemaVersion()
     {
-        return SchemaManager.instance.getVersion().toString();
+        return SchemaManager.instance.getVersionAsUUID().toString();
     }
 
     public String getKeyspaceReplicationInfo(String keyspaceName)
@@ -5251,14 +5253,14 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         ColumnFamilyStore.rebuildSecondaryIndex(ksName, cfName, indices);
     }
 
-    public void resetLocalSchema() throws IOException
+    public void resetLocalSchema()
     {
-        MigrationManager.resetLocalSchema();
+        SchemaManager.instance.resetLegacyLocalSchema();
     }
 
     public void reloadLocalSchema()
     {
-        SchemaManager.instance.reloadSchemaAndAnnounceVersion();
+        SchemaManager.instance.tryReloadingSchemaFromDisk();
     }
 
     public void setTraceProbability(double probability)

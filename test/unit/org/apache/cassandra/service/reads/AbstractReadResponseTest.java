@@ -68,12 +68,14 @@ import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.net.Verb.READ_REQ;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 /**
  * Base class for testing various components which deal with read responses
@@ -147,8 +149,15 @@ public abstract class AbstractReadResponseTest
                      .addRegularColumn("m", MapType.getInstance(IntegerType.instance, IntegerType.instance, true));
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(2), builder1, builder2);
-        SchemaLoader.createKeyspace(KEYSPACE3, KeyspaceParams.simple(4), builder3);
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1, 2),
+            createTable(builder1.build()),
+            createTable(builder2.build()),
+
+            createKeyspace(KEYSPACE3, 4),
+            createTable(builder3.build())
+        );
 
         ks = Keyspace.open(KEYSPACE1);
         cfs = ks.getColumnFamilyStore(CF_STANDARD);

@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Predicates;
+
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.locator.EndpointsForToken;
 import org.apache.cassandra.locator.ReplicaPlans;
@@ -49,7 +50,10 @@ import org.apache.cassandra.net.Verb;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.net.NoPayload.noPayload;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -120,7 +124,12 @@ public class WriteResponseHandlerTest
             }
         });
         DatabaseDescriptor.setBroadcastAddress(InetAddress.getByName("127.1.0.1"));
-        SchemaLoader.createKeyspace("Foo", KeyspaceParams.nts("datacenter1", 3, "datacenter2", 3), SchemaLoader.standardCFMD("Foo", "Bar"));
+
+        doSchemaChanges(
+            createKeyspace("Foo", KeyspaceParams.nts("datacenter1", 3, "datacenter2", 3)),
+            createTable(SchemaLoader.standardCFMD("Foo", "Bar").build())
+        );
+
         ks = Keyspace.open("Foo");
         cfs = ks.getColumnFamilyStore("Bar");
         targets = EndpointsForToken.of(DatabaseDescriptor.getPartitioner().getToken(ByteBufferUtil.bytes(0)),

@@ -25,7 +25,6 @@ import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.dht.Bounds;
 import org.apache.cassandra.dht.Token;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -37,6 +36,9 @@ import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.service.CacheService;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
@@ -52,14 +54,18 @@ public class CounterCacheTest
     {
         SchemaLoader.prepareServer();
 
-        TableMetadata.Builder counterTable =
+        TableMetadata counterTable =
             TableMetadata.builder(KEYSPACE1, COUNTER1)
                          .isCounter(true)
                          .addPartitionKeyColumn("key", Int32Type.instance)
                          .addClusteringColumn("name", Int32Type.instance)
-                         .addRegularColumn("c", CounterColumnType.instance);
+                         .addRegularColumn("c", CounterColumnType.instance)
+                         .build();
 
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1), counterTable);
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(counterTable)
+        );
     }
 
     @AfterClass

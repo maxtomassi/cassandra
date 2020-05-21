@@ -35,10 +35,12 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.KeyIterator;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.streaming.StreamOperation;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -56,14 +58,17 @@ public class CassandraOutgoingFileTest
     public static void defineSchemaAndPrepareSSTable()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARD),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEXED, true),
-                                    SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARDLOWINDEXINTERVAL)
-                                                .minIndexInterval(8)
-                                                .maxIndexInterval(256)
-                                                .caching(CachingParams.CACHE_NOTHING));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARD).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEXED, true).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARDLOWINDEXINTERVAL)
+                                    .minIndexInterval(8)
+                                    .maxIndexInterval(256)
+                                    .caching(CachingParams.CACHE_NOTHING)
+                                    .build())
+        );
 
         Keyspace keyspace = Keyspace.open(KEYSPACE);
         store = keyspace.getColumnFamilyStore(CF_STANDARD);

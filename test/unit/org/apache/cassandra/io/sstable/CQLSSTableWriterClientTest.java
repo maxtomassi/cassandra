@@ -27,6 +27,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.io.util.FileUtils;
 
@@ -41,6 +43,8 @@ public class CQLSSTableWriterClientTest
     {
         this.testDirectory = Files.createTempDir();
         DatabaseDescriptor.daemonInitialization();
+        Keyspace.setInitialized();
+        CommitLog.instance.start();
     }
 
     @Test

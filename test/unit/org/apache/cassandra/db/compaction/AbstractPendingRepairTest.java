@@ -35,10 +35,13 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.repair.AbstractRepairTest;
 import org.apache.cassandra.repair.consistent.LocalSessionAccessor;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ActiveRepairService;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 @Ignore
 public class AbstractPendingRepairTest extends AbstractRepairTest
@@ -69,7 +72,12 @@ public class AbstractPendingRepairTest extends AbstractRepairTest
     {
         ks = "ks_" + System.currentTimeMillis();
         cfm = CreateTableStatement.parse(String.format("CREATE TABLE %s.%s (k INT PRIMARY KEY, v INT)", ks, tbl), ks).build();
-        SchemaLoader.createKeyspace(ks, KeyspaceParams.simple(1), cfm);
+
+        doSchemaChanges(
+            createKeyspace(ks),
+            createTable(cfm)
+        );
+
         cfs = SchemaManager.instance.getColumnFamilyStoreInstance(cfm.id);
         csm = cfs.getCompactionStrategyManager();
         nextSSTableKey = 0;

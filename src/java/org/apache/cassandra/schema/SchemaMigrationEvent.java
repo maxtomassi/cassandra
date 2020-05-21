@@ -74,7 +74,7 @@ final class SchemaMigrationEvent extends DiagnosticEvent
         this.endpoint = endpoint;
         this.endpointSchemaVersion = endpointSchemaVersion;
 
-        localSchemaVersion = SchemaManager.instance.getVersion();
+        localSchemaVersion = SchemaManager.instance.getVersionAsUUID();
         localMessagingVersion = MessagingService.current_version;
 
         Queue<CountDownLatch> inflightTasks = MigrationTask.getInflightTasks();
@@ -101,8 +101,8 @@ final class SchemaMigrationEvent extends DiagnosticEvent
     {
         HashMap<String, Serializable> ret = new HashMap<>();
         if (endpoint != null) ret.put("endpoint", endpoint.getHostAddress(true));
-        ret.put("endpointSchemaVersion", SchemaManager.schemaVersionToString(endpointSchemaVersion));
-        ret.put("localSchemaVersion", SchemaManager.schemaVersionToString(localSchemaVersion));
+        ret.put("endpointSchemaVersion", MigrationManager.schemaVersionToString(endpointSchemaVersion));
+        ret.put("localSchemaVersion", MigrationManager.schemaVersionToString(localSchemaVersion));
         if (endpointMessagingVersion != null) ret.put("endpointMessagingVersion", endpointMessagingVersion);
         if (localMessagingVersion != null) ret.put("localMessagingVersion", localMessagingVersion);
         if (endpointGossipOnlyMember != null) ret.put("endpointGossipOnlyMember", endpointGossipOnlyMember);

@@ -23,7 +23,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
@@ -42,7 +41,6 @@ import org.apache.cassandra.concurrent.NamedThreadFactory;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.RowUpdateBuilder;
-import org.apache.cassandra.db.compaction.AntiCompactionTest;
 import org.apache.cassandra.db.compaction.CompactionInfo;
 import org.apache.cassandra.db.compaction.CompactionInterruptedException;
 import org.apache.cassandra.db.compaction.CompactionManager;
@@ -51,20 +49,21 @@ import org.apache.cassandra.db.compaction.OperationType;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.metrics.CompactionMetrics;
 import org.apache.cassandra.metrics.RestorableMeter;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 import static com.google.common.collect.ImmutableMap.of;
 import static java.util.Arrays.asList;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.Util.assertOnDiskState;
 import static org.apache.cassandra.io.sstable.Downsampling.BASE_SAMPLING_LEVEL;
 import static org.apache.cassandra.io.sstable.IndexSummaryRedistribution.DOWNSAMPLE_THESHOLD;
 import static org.apache.cassandra.io.sstable.IndexSummaryRedistribution.UPSAMPLE_THRESHOLD;
+import static org.apache.cassandra.schema.SchemaTransformations.alterTable;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -89,16 +88,20 @@ public class IndexSummaryManagerTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLOWiINTERVAL)
-                                                .minIndexInterval(8)
-                                                .maxIndexInterval(256)
-                                                .caching(CachingParams.CACHE_NOTHING),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDRACE)
-                                                .minIndexInterval(8)
-                                                .maxIndexInterval(256)
-                                                .caching(CachingParams.CACHE_NOTHING));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLOWiINTERVAL)
+                                    .minIndexInterval(8)
+                                    .maxIndexInterval(256)
+                                    .caching(CachingParams.CACHE_NOTHING)
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDRACE)
+                                    .minIndexInterval(8)
+                                    .maxIndexInterval(256)
+                                    .caching(CachingParams.CACHE_NOTHING)
+                                    .build())
+        );
     }
 
     @Before
@@ -123,11 +126,11 @@ public class IndexSummaryManagerTest
 
         String ksname = KEYSPACE1;
         String cfname = CF_STANDARDLOWiINTERVAL; // index interval of 8, no key caching
-        Keyspace keyspace = Keyspace.open(ksname);
-        ColumnFamilyStore cfs = keyspace.getColumnFamilyStore(cfname);
 
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval).build(), true);
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(originalMaxIndexInterval).build(), true);
+        doSchemaChanges(
+            alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval)
+                                             .maxIndexInterval(originalMaxIndexInterval))
+        );
 
         IndexSummaryManager.instance.setMemoryPoolCapacityInMB(originalCapacity);
     }
@@ -232,7 +235,8 @@ public class IndexSummaryManagerTest
             assertEquals(cfs.metadata().params.minIndexInterval, sstable.getEffectiveIndexInterval(), 0.001);
 
         // double the min_index_interval
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval * 2).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval * 2)));
+
         IndexSummaryManager.instance.redistributeSummaries();
         for (SSTableReader sstable : cfs.getLiveSSTables())
         {
@@ -241,7 +245,8 @@ public class IndexSummaryManagerTest
         }
 
         // return min_index_interval to its original value
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval)));
+
         IndexSummaryManager.instance.redistributeSummaries();
         for (SSTableReader sstable : cfs.getLiveSSTables())
         {
@@ -251,7 +256,8 @@ public class IndexSummaryManagerTest
 
         // halve the min_index_interval, but constrain the available space to exactly what we have now; as a result,
         // the summary shouldn't change
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval / 2).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval / 2)));
+
         SSTableReader sstable = cfs.getLiveSSTables().iterator().next();
         long summarySpace = sstable.getIndexSummaryOffHeapSize();
         try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
@@ -276,7 +282,8 @@ public class IndexSummaryManagerTest
 
         // return min_index_interval to it's original value (double it), but only give the summary enough space
         // to have an effective index interval of twice the new min
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval)));
+
         try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), (long) Math.ceil(summarySpace / 2.0));
@@ -288,8 +295,9 @@ public class IndexSummaryManagerTest
         // raise the min_index_interval above our current effective interval, but set the max_index_interval lower
         // than what we actually have space for (meaning the index summary would ideally be smaller, but this would
         // result in an effective interval above the new max)
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval * 4).build(), true);
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(originalMinIndexInterval * 4).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval * 4)
+                                                         .maxIndexInterval(originalMinIndexInterval * 4)));
+
         try (LifecycleTransaction txn = cfs.getTracker().tryModify(asList(sstable), OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 10);
@@ -322,7 +330,8 @@ public class IndexSummaryManagerTest
             assertEquals(cfs.metadata().params.maxIndexInterval, sstable.getEffectiveIndexInterval(), 0.01);
 
         // halve the max_index_interval
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(cfs.metadata().params.maxIndexInterval / 2).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.maxIndexInterval(cfs.metadata().params.maxIndexInterval / 2)));
+
         try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 1);
@@ -335,7 +344,8 @@ public class IndexSummaryManagerTest
         }
 
         // return max_index_interval to its original value
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().maxIndexInterval(cfs.metadata().params.maxIndexInterval * 2).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.maxIndexInterval(cfs.metadata().params.maxIndexInterval * 2)));
+
         try (LifecycleTransaction txn = cfs.getTracker().tryModify(sstables, OperationType.UNKNOWN))
         {
             redistributeSummaries(Collections.EMPTY_LIST, of(cfs.metadata.id, txn), 1);

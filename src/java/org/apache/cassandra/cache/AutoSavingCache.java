@@ -203,11 +203,11 @@ public class AutoSavingCache<K extends CacheKey, V> extends InstrumentingCache<K
 
                 //Check the schema has not changed since CFs are looked up by name which is ambiguous
                 UUID schemaVersion = new UUID(in.readLong(), in.readLong());
-                if (!schemaVersion.equals(SchemaManager.instance.getVersion()))
+                if (!schemaVersion.equals(SchemaManager.instance.getVersionAsUUID()))
                     throw new RuntimeException("Cache schema version "
                                                + schemaVersion
                                                + " does not match current schema version "
-                                               + SchemaManager.instance.getVersion());
+                                               + SchemaManager.instance.getVersionAsUUID());
 
                 ArrayDeque<Future<Pair<K, V>>> futures = new ArrayDeque<Future<Pair<K, V>>>();
                 while (in.available() > 0)
@@ -354,12 +354,7 @@ public class AutoSavingCache<K extends CacheKey, V> extends InstrumentingCache<K
             {
 
                 //Need to be able to check schema version because CF names are ambiguous
-                UUID schemaVersion = SchemaManager.instance.getVersion();
-                if (schemaVersion == null)
-                {
-                    SchemaManager.instance.updateVersion();
-                    schemaVersion = SchemaManager.instance.getVersion();
-                }
+                UUID schemaVersion = SchemaManager.instance.getVersionAsUUID();
                 writer.writeLong(schemaVersion.getMostSignificantBits());
                 writer.writeLong(schemaVersion.getLeastSignificantBits());
 

@@ -29,6 +29,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.cql3.Operator;
@@ -39,13 +40,15 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.index.Index;
 import org.apache.cassandra.schema.IndexMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.addIndex;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.Util.throwAssert;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -64,12 +67,22 @@ public class SecondaryIndexTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE1, WITH_COMPOSITE_INDEX, true, true).gcGraceSeconds(0),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE1, COMPOSITE_INDEX_TO_BE_ADDED, false).gcGraceSeconds(0),
-                                    SchemaLoader.compositeMultipleIndexCFMD(KEYSPACE1, WITH_MULTIPLE_COMPOSITE_INDEX).gcGraceSeconds(0),
-                                    SchemaLoader.keysIndexCFMD(KEYSPACE1, WITH_KEYS_INDEX, true).gcGraceSeconds(0));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE1, WITH_COMPOSITE_INDEX, true, true)
+                                    .gcGraceSeconds(0)
+                                    .build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE1, COMPOSITE_INDEX_TO_BE_ADDED, false)
+                                    .gcGraceSeconds(0)
+                                    .build()),
+            createTable(SchemaLoader.compositeMultipleIndexCFMD(KEYSPACE1, WITH_MULTIPLE_COMPOSITE_INDEX)
+                                    .gcGraceSeconds(0)
+                                    .build()),
+            createTable(SchemaLoader.keysIndexCFMD(KEYSPACE1, WITH_KEYS_INDEX, true)
+                                    .gcGraceSeconds(0)
+                                    .build())
+        );
     }
 
     @Before
@@ -476,13 +489,7 @@ public class SecondaryIndexTest
                                            IndexMetadata.Kind.COMPOSITES,
                                            Collections.EMPTY_MAP);
 
-        TableMetadata current = cfs.metadata();
-
-        TableMetadata updated =
-            current.unbuild()
-                   .indexes(current.indexes.with(indexDef))
-                   .build();
-        MigrationManager.announceTableUpdate(updated, true);
+        doSchemaChanges(addIndex(cfs.metadata(), indexDef));
 
         // fait for the index to be built
         Index index = cfs.indexManager.getIndex(indexDef);

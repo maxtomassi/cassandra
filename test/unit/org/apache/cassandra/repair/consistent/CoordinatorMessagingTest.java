@@ -53,14 +53,16 @@ import org.apache.cassandra.repair.messages.FinalizePromise;
 import org.apache.cassandra.repair.messages.FinalizePropose;
 import org.apache.cassandra.repair.messages.PrepareConsistentRequest;
 import org.apache.cassandra.repair.messages.PrepareConsistentResponse;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ActiveRepairService;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.net.MockMessagingService.all;
 import static org.apache.cassandra.net.MockMessagingService.to;
 import static org.apache.cassandra.net.MockMessagingService.verb;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.fail;
 
 public class CoordinatorMessagingTest extends AbstractRepairTest
@@ -80,7 +82,12 @@ public class CoordinatorMessagingTest extends AbstractRepairTest
     {
         String ks = "ks_" + System.currentTimeMillis();
         TableMetadata cfm = CreateTableStatement.parse(String.format("CREATE TABLE %s.%s (k INT PRIMARY KEY, v INT)", ks, "tbl"), ks).build();
-        SchemaLoader.createKeyspace(ks, KeyspaceParams.simple(1), cfm);
+
+        doSchemaChanges(
+            createKeyspace(ks),
+            createTable(cfm)
+        );
+
         cfs = SchemaManager.instance.getColumnFamilyStoreInstance(cfm.id);
         cfs.disableAutoCompaction();
     }

@@ -46,11 +46,13 @@ import org.apache.cassandra.dht.ByteOrderedPartitioner.BytesToken;
 import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.metrics.ClearableHistogram;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 public class RowCacheTest
@@ -65,13 +67,19 @@ public class RowCacheTest
     {
         System.setProperty("org.caffinitas.ohc.segmentCount", "16");
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE_CACHED,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHEDNOCLUSTER, 1, AsciiType.instance, AsciiType.instance, null)
-                                                .caching(new CachingParams(true, 100)),
-                                    SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHED).caching(CachingParams.CACHE_EVERYTHING),
-                                    SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHEDINT, 1, IntegerType.instance)
-                                                .caching(new CachingParams(true, 100)));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE_CACHED),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHEDNOCLUSTER, 1, AsciiType.instance, AsciiType.instance, null)
+                                    .caching(new CachingParams(true, 100))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHED)
+                                    .caching(CachingParams.CACHE_EVERYTHING)
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHEDINT, 1, IntegerType.instance)
+                                    .caching(new CachingParams(true, 100))
+                                    .build())
+        );
     }
 
     @AfterClass

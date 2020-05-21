@@ -49,13 +49,15 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.service.StorageService;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.cql3.QueryProcessor.executeInternal;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 public class BatchlogManagerTest
@@ -75,13 +77,15 @@ public class BatchlogManagerTest
         DatabaseDescriptor.daemonInitialization();
         sw = Util.switchPartitioner(Murmur3Partitioner.instance);
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1, 1, BytesType.instance),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2, 1, BytesType.instance),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD3, 1, BytesType.instance),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD4, 1, BytesType.instance),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD5, 1, BytesType.instance));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1, 1, BytesType.instance).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2, 1, BytesType.instance).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD3, 1, BytesType.instance).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD4, 1, BytesType.instance).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD5, 1, BytesType.instance).build())
+        );
     }
 
     @AfterClass

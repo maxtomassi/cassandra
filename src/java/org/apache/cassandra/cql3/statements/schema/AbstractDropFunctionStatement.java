@@ -131,7 +131,7 @@ abstract class AbstractDropFunctionStatement extends AbstractFunctionStatement
 
         checkDropValid(keyspace, function);
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.functions.without(function)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.functions.without(function)));
     }
 
     @Override

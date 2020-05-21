@@ -35,8 +35,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
-import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -46,11 +44,13 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.db.marshal.BytesType;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.Tables;
 import org.apache.cassandra.security.EncryptionContextGenerator;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.KillerForTests;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 /**
  * Note: if you are looking to create new test cases for this test, check out
@@ -111,7 +111,6 @@ public class CommitLogUpgradeTest
     public static void initialize()
     {
         SchemaLoader.loadSchema();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1), metadata);
         DatabaseDescriptor.setEncryptionContext(EncryptionContextGenerator.createContext(true));
     }
 
@@ -126,8 +125,12 @@ public class CommitLogUpgradeTest
         if (cfidString != null)
         {
             TableId tableId = TableId.fromString(cfidString);
-            if (SchemaManager.instance.getTableMetadata(tableId) == null)
-                SchemaManager.instance.load(KeyspaceMetadata.create(KEYSPACE, KeyspaceParams.simple(1), Tables.of(metadata.unbuild().id(tableId).build())));
+            TableMetadata toCreate = metadata.unbuild().id(tableId).build();
+
+            doSchemaChanges(
+                createKeyspace(KEYSPACE),
+                createTable(toCreate)
+            );
         }
 
         Hasher hasher = new Hasher();

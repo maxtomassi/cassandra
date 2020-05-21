@@ -34,6 +34,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.filter.ClusteringIndexSliceFilter;
@@ -69,11 +70,7 @@ import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.Verb;
 import org.apache.cassandra.repair.consistent.LocalSessionAccessor;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.TableParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.PreviewKind;
 import org.apache.cassandra.tracing.Tracing;
@@ -81,6 +78,9 @@ import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.utils.ByteBufferUtil.EMPTY_BYTE_BUFFER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -190,17 +190,19 @@ public class ReadCommandTest
                      .addRegularColumn("a", AsciiType.instance);
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    metadata1,
-                                    metadata2,
-                                    metadata3,
-                                    metadata4,
-                                    metadata5,
-                                    metadata6,
-                                    metadata7,
-                                    metadata8,
-                                    metadata9);
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(metadata1.build()),
+            createTable(metadata2.build()),
+            createTable(metadata3.build()),
+            createTable(metadata4.build()),
+            createTable(metadata5.build()),
+            createTable(metadata6.build()),
+            createTable(metadata7.build()),
+            createTable(metadata8.build()),
+            createTable(metadata9.build())
+        );
 
         LocalSessionAccessor.startup();
     }
@@ -896,12 +898,7 @@ public class ReadCommandTest
 
     private void setGCGrace(ColumnFamilyStore cfs, int gcGrace)
     {
-        TableParams newParams = cfs.metadata().params.unbuild().gcGraceSeconds(gcGrace).build();
-        KeyspaceMetadata keyspaceMetadata = SchemaManager.instance.getKeyspaceMetadata(cfs.metadata().keyspace);
-        SchemaManager.instance.load(
-        keyspaceMetadata.withSwapped(
-        keyspaceMetadata.tables.withSwapped(
-        cfs.metadata().withSwapped(newParams))));
+        doSchemaChanges(SchemaTestUtils.updateGCGrace(cfs.metadata(), gcGrace));
     }
 
     private long getAndResetOverreadCount(ColumnFamilyStore cfs)

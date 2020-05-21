@@ -138,7 +138,7 @@ public final class CreateIndexStatement extends AlterSchemaStatement
         TableMetadata newTable = table.withSwapped(table.indexes.with(index));
         newTable.validate();
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
     }
 
     @Override

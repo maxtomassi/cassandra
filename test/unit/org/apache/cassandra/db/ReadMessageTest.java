@@ -18,6 +18,9 @@
 */
 package org.apache.cassandra.db;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 import java.io.*;
@@ -81,16 +84,16 @@ public class ReadMessageTest
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF),
-                                    cfForReadMetadata,
-                                    cfForCommitMetadata1);
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF).build()),
+            createTable(cfForReadMetadata.build()),
+            createTable(cfForCommitMetadata1.build()),
 
-        SchemaLoader.createKeyspace(KEYSPACENOCOMMIT,
-                                    KeyspaceParams.simpleTransient(1),
-                                    SchemaLoader.standardCFMD(KEYSPACENOCOMMIT, CF),
-                                    cfForCommitMetadata2);
+            createKeyspace(KEYSPACENOCOMMIT, KeyspaceParams.simpleTransient(1)),
+            createTable(SchemaLoader.standardCFMD(KEYSPACENOCOMMIT, CF).build()),
+            createTable(cfForCommitMetadata2.build())
+        );
     }
 
     @Test

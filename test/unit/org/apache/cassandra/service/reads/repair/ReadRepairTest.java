@@ -50,14 +50,13 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.Replica;
 import org.apache.cassandra.net.Message;
-import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.Tables;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.locator.ReplicaUtils.full;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class ReadRepairTest
 {
@@ -115,8 +114,11 @@ public class ReadRepairTest
         String ksName = "ks";
 
         cfm = CreateTableStatement.parse("CREATE TABLE tbl (k int primary key, v text)", ksName).build();
-        KeyspaceMetadata ksm = KeyspaceMetadata.create(ksName, KeyspaceParams.simple(3), Tables.of(cfm));
-        MigrationManager.announceNewKeyspace(ksm, false);
+
+        doSchemaChanges(
+            createKeyspace(ksName, 3),
+            createTable(cfm)
+        );
 
         ks = Keyspace.open(ksName);
         cfs = ks.getColumnFamilyStore("tbl");

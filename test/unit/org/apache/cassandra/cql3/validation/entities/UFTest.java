@@ -38,11 +38,15 @@ import org.apache.cassandra.db.marshal.CollectionType;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.SchemaManager;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.*;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.utils.ByteBufferUtil;
+
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.dropFunction;
 
 public class UFTest extends CQLTester
 {
@@ -845,7 +849,11 @@ public class UFTest extends CQLTester
                                                             "java",
                                                             f.body(),
                                                             new InvalidRequestException("foo bar is broken"));
-        SchemaManager.instance.load(ksm.withSwapped(ksm.functions.without(f.name(), f.argTypes()).with(broken)));
+
+        doSchemaChanges(
+            SchemaTransformations.dropFunction(KEYSPACE_PER_TEST, f),
+            SchemaTransformations.createFunction(KEYSPACE_PER_TEST, broken)
+        );
 
         assertInvalidThrowMessage("foo bar is broken", InvalidRequestException.class,
                                   "SELECT key, " + fName + "(dval) FROM %s");

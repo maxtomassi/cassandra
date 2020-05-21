@@ -43,7 +43,6 @@ import org.junit.Test;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.Replica;
 import org.apache.cassandra.locator.ReplicaCollection;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -69,6 +68,8 @@ import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.Tables;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createKeyspace;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotNull;
@@ -188,7 +189,7 @@ public class MoveTest
                                                                                     .addPartitionKeyColumn("key", BytesType.instance)
                                                                                     .build()));
 
-        MigrationManager.announceNewKeyspace(keyspace);
+        doSchemaChanges(createKeyspace(keyspace));
     }
 
     private static Object[] configOptions(Integer[] replicas)

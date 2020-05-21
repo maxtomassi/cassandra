@@ -44,13 +44,16 @@ import org.apache.cassandra.index.StubIndex;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.metadata.StatsMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
 import static org.apache.cassandra.SchemaLoader.standardCFMD;
+import static org.apache.cassandra.SchemaTestUtils.addIndex;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.alterTable;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -64,9 +67,11 @@ public class RangeTombstoneTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KSNAME,
-                                    KeyspaceParams.simple(1),
-                                    standardCFMD(KSNAME, CFNAME, 1, UTF8Type.instance, Int32Type.instance, Int32Type.instance));
+
+        doSchemaChanges(
+            createKeyspace(KSNAME),
+            createTable(standardCFMD(KSNAME, CFNAME, 1, UTF8Type.instance, Int32Type.instance, Int32Type.instance).build())
+        );
     }
 
     @Test
@@ -320,7 +325,8 @@ public class RangeTombstoneTest
     {
         Keyspace ks = Keyspace.open(KSNAME);
         ColumnFamilyStore cfs = ks.getColumnFamilyStore(CFNAME);
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(2).build(), true);
+
+        doSchemaChanges(alterTable(ks.getName(), cfs.name, b -> b.gcGraceSeconds(2)));
 
         String key = "7810";
 
@@ -343,7 +349,7 @@ public class RangeTombstoneTest
     {
         Keyspace ks = Keyspace.open(KSNAME);
         ColumnFamilyStore cfs = ks.getColumnFamilyStore(CFNAME);
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(2).build(), true);
+        doSchemaChanges(alterTable(ks.getName(), cfs.name, b -> b.gcGraceSeconds(2)));
 
         String key = "7808_1";
         UpdateBuilder builder = UpdateBuilder.create(cfs.metadata(), key).withTimestamp(0);
@@ -363,7 +369,7 @@ public class RangeTombstoneTest
     {
         Keyspace ks = Keyspace.open(KSNAME);
         ColumnFamilyStore cfs = ks.getColumnFamilyStore(CFNAME);
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(2).build(), true);
+        doSchemaChanges(alterTable(ks.getName(), cfs.name, b -> b.gcGraceSeconds(2)));
 
         String key = "7808_2";
         UpdateBuilder builder = UpdateBuilder.create(cfs.metadata(), key).withTimestamp(0);
@@ -464,8 +470,8 @@ public class RangeTombstoneTest
     @Test
     public void testRowWithRangeTombstonesUpdatesSecondaryIndex() throws Exception
     {
-        Keyspace table = Keyspace.open(KSNAME);
-        ColumnFamilyStore cfs = table.getColumnFamilyStore(CFNAME);
+        Keyspace keyspace = Keyspace.open(KSNAME);
+        ColumnFamilyStore cfs = keyspace.getColumnFamilyStore(CFNAME);
         ByteBuffer key = ByteBufferUtil.bytes("k5");
         ByteBuffer indexedColumnName = ByteBufferUtil.bytes("val");
 
@@ -481,15 +487,11 @@ public class RangeTombstoneTest
                                            ImmutableMap.of(IndexTarget.CUSTOM_INDEX_OPTION_NAME,
                                                            StubIndex.class.getName()));
 
-        TableMetadata current = cfs.metadata();
+        TableMetadata table = cfs.metadata();
 
-        if (!current.indexes.get("test_index").isPresent())
+        if (!table.indexes.get("test_index").isPresent())
         {
-            TableMetadata updated =
-                current.unbuild()
-                       .indexes(current.indexes.with(indexDef))
-                       .build();
-            MigrationManager.announceTableUpdate(updated, true);
+            doSchemaChanges(addIndex(table, indexDef));
         }
 
         Future<?> rebuild = cfs.indexManager.addIndex(indexDef, false);
@@ -570,8 +572,8 @@ public class RangeTombstoneTest
     @Test
     public void testOverwritesToDeletedColumns() throws Exception
     {
-        Keyspace table = Keyspace.open(KSNAME);
-        ColumnFamilyStore cfs = table.getColumnFamilyStore(CFNAME);
+        Keyspace keyspace = Keyspace.open(KSNAME);
+        ColumnFamilyStore cfs = keyspace.getColumnFamilyStore(CFNAME);
         ByteBuffer key = ByteBufferUtil.bytes("k6");
         ByteBuffer indexedColumnName = ByteBufferUtil.bytes("val");
 
@@ -587,15 +589,11 @@ public class RangeTombstoneTest
                                            ImmutableMap.of(IndexTarget.CUSTOM_INDEX_OPTION_NAME,
                                                            StubIndex.class.getName()));
 
-        TableMetadata current = cfs.metadata();
+        TableMetadata table = cfs.metadata();
 
-        if (!current.indexes.get("test_index").isPresent())
+        if (!table.indexes.get("test_index").isPresent())
         {
-            TableMetadata updated =
-                current.unbuild()
-                       .indexes(current.indexes.with(indexDef))
-                       .build();
-            MigrationManager.announceTableUpdate(updated, true);
+            doSchemaChanges(addIndex(table, indexDef));
         }
 
         Future<?> rebuild = cfs.indexManager.addIndex(indexDef, false);

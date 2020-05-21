@@ -29,18 +29,16 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Session;
 import org.apache.cassandra.OrderedJUnit4ClassRunner;
-import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.service.EmbeddedCassandraService;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(OrderedJUnit4ClassRunner.class)
-public class TableMetricsTest extends SchemaLoader
+public class TableMetricsTest
 {
 
     private static Session session;
@@ -52,8 +50,6 @@ public class TableMetricsTest extends SchemaLoader
     @BeforeClass()
     public static void setup() throws ConfigurationException, IOException
     {
-        SchemaManager.instance.clear();
-
         EmbeddedCassandraService cassandra = new EmbeddedCassandraService();
         cassandra.start();
 

@@ -151,7 +151,7 @@ public class LocalKeyspaces
         for (TableMetadata tableMetadata : localKeyspace.tablesAndViews())
             localSystemTables.put(tableMetadata.id, tableMetadata);
 
-        schemaManager.loadNew(localKeyspace);
+        schemaManager.addNewRefs(localKeyspace);
     }
 
     public void load(VirtualKeyspace keyspace)

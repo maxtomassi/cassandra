@@ -2256,7 +2256,7 @@ public class StorageProxy implements StorageProxyMBean
      */
     public static Map<String, List<String>> describeSchemaVersions(boolean withPort)
     {
-        final String myVersion = SchemaManager.instance.getVersion().toString();
+        final String myVersion = SchemaManager.instance.getVersionAsUUID().toString();
         final Map<InetAddressAndPort, UUID> versions = new ConcurrentHashMap<>();
         final Set<InetAddressAndPort> liveHosts = Gossiper.instance.getLiveMembers();
         final CountDownLatch latch = new CountDownLatch(liveHosts.size());

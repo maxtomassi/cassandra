@@ -59,13 +59,16 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.io.util.UnbufferedDataOutputStreamPlus;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.ObjectSizes;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 @RunWith(OrderedJUnit4ClassRunner.class)
 public class CompactionAllocationTest
@@ -460,8 +463,10 @@ public class CompactionAllocationTest
     {
         String ksname = "ks_" + name.toLowerCase();
 
-        SchemaLoader.createKeyspace(ksname, KeyspaceParams.simple(1),
-                                    CreateTableStatement.parse("CREATE TABLE tbl (k INT PRIMARY KEY, v INT)", ksname).build());
+        doSchemaChanges(
+            createKeyspace(ksname),
+            createTable(CreateTableStatement.parse("CREATE TABLE tbl (k INT PRIMARY KEY, v INT)", ksname).build())
+        );
 
         ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(SchemaManager.instance.getTableMetadata(ksname, "tbl").id);
         Assert.assertNotNull(cfs);
@@ -569,8 +574,10 @@ public class CompactionAllocationTest
     {
         String ksname = "ks_" + name.toLowerCase();
 
-        SchemaLoader.createKeyspace(ksname, KeyspaceParams.simple(1),
-                                    CreateTableStatement.parse("CREATE TABLE tbl (k text, c text, v1 text, v2 text, v3 text, v4 text, PRIMARY KEY (k, c))", ksname).build());
+        doSchemaChanges(
+            createKeyspace(ksname),
+            createTable(CreateTableStatement.parse("CREATE TABLE tbl (k text, c text, v1 text, v2 text, v3 text, v4 text, PRIMARY KEY (k, c))", ksname).build())
+        );
 
         ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(SchemaManager.instance.getTableMetadata(ksname, "tbl").id);
         Assert.assertNotNull(cfs);
@@ -668,8 +675,10 @@ public class CompactionAllocationTest
     {
         String ksname = "ks_" + name.toLowerCase();
 
-        SchemaLoader.createKeyspace(ksname, KeyspaceParams.simple(1),
-                                    CreateTableStatement.parse("CREATE TABLE tbl (k text, c text, v1 text, v2 text, v3 text, v4 text, PRIMARY KEY (k, c))", ksname).build());
+        doSchemaChanges(
+            createKeyspace(ksname),
+            createTable(CreateTableStatement.parse("CREATE TABLE tbl (k text, c text, v1 text, v2 text, v3 text, v4 text, PRIMARY KEY (k, c))", ksname).build())
+        );
 
         ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(SchemaManager.instance.getTableMetadata(ksname, "tbl").id);
         Assert.assertNotNull(cfs);

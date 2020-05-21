@@ -28,6 +28,8 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.gms.Gossiper;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -53,19 +55,20 @@ public class SchemaManagerTest
         try
         {
             // add a few.
-            MigrationManager.announceNewKeyspace(KeyspaceMetadata.create("ks0", KeyspaceParams.simple(3)));
-            MigrationManager.announceNewKeyspace(KeyspaceMetadata.create("ks1", KeyspaceParams.simple(3)));
+            doSchemaChanges(
+                createKeyspace("ks0", 3),
+                createKeyspace("ks1", 3)
+            );
 
             assertNotNull(SchemaManager.instance.getKeyspaceMetadata("ks0"));
             assertNotNull(SchemaManager.instance.getKeyspaceMetadata("ks1"));
 
-            SchemaManager.instance.unload(SchemaManager.instance.getKeyspaceMetadata("ks0"));
-            SchemaManager.instance.unload(SchemaManager.instance.getKeyspaceMetadata("ks1"));
+            SchemaManager.instance.clearInMemoryUnsafe();
 
             assertNull(SchemaManager.instance.getKeyspaceMetadata("ks0"));
             assertNull(SchemaManager.instance.getKeyspaceMetadata("ks1"));
 
-            SchemaManager.instance.loadFromDisk();
+            SchemaManager.instance.tryReloadingSchemaFromDisk();
 
             assertNotNull(SchemaManager.instance.getKeyspaceMetadata("ks0"));
             assertNotNull(SchemaManager.instance.getKeyspaceMetadata("ks1"));

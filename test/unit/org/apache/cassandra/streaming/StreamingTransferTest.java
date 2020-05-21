@@ -51,15 +51,16 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.concurrent.Refs;
 
 import static org.apache.cassandra.SchemaLoader.compositeIndexCFMD;
-import static org.apache.cassandra.SchemaLoader.createKeyspace;
 import static org.apache.cassandra.SchemaLoader.standardCFMD;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -90,25 +91,32 @@ public class StreamingTransferTest
         SchemaLoader.prepareServer();
         StorageService.instance.initServer();
 
-        createKeyspace(KEYSPACE1,
-                       KeyspaceParams.simple(1),
-                       standardCFMD(KEYSPACE1, CF_STANDARD),
-                       TableMetadata.builder(KEYSPACE1, CF_COUNTER)
-                                    .isCounter(true)
-                                    .addPartitionKeyColumn("key", BytesType.instance),
-                       TableMetadata.builder(KEYSPACE1, CF_STANDARDINT)
-                                    .addPartitionKeyColumn("key", AsciiType.instance)
-                                    .addClusteringColumn("cols", Int32Type.instance)
-                                    .addRegularColumn("val", BytesType.instance),
-                       compositeIndexCFMD(KEYSPACE1, CF_INDEX, true));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
 
-        createKeyspace(KEYSPACE2, KeyspaceParams.simple(1));
+            createTable(standardCFMD(KEYSPACE1, CF_STANDARD).build()),
 
-        createKeyspace(KEYSPACE_CACHEKEY,
-                       KeyspaceParams.simple(1),
-                       standardCFMD(KEYSPACE_CACHEKEY, CF_STANDARD),
-                       standardCFMD(KEYSPACE_CACHEKEY, CF_STANDARD2),
-                       standardCFMD(KEYSPACE_CACHEKEY, CF_STANDARD3));
+            createTable(TableMetadata.builder(KEYSPACE1, CF_COUNTER)
+                                                           .isCounter(true)
+                                                           .addPartitionKeyColumn("key", BytesType.instance)
+                                                           .build()),
+
+            createTable(TableMetadata.builder(KEYSPACE1, CF_STANDARDINT)
+                                                           .addPartitionKeyColumn("key", AsciiType.instance)
+                                                           .addClusteringColumn("cols", Int32Type.instance)
+                                                           .addRegularColumn("val", BytesType.instance)
+                                                           .build()),
+
+            createTable(compositeIndexCFMD(KEYSPACE1, CF_INDEX, true).build()),
+
+            createKeyspace(KEYSPACE2),
+
+            createKeyspace(KEYSPACE_CACHEKEY),
+
+            createTable(standardCFMD(KEYSPACE_CACHEKEY, CF_STANDARD).build()),
+            createTable(standardCFMD(KEYSPACE_CACHEKEY, CF_STANDARD2).build()),
+            createTable(standardCFMD(KEYSPACE_CACHEKEY, CF_STANDARD3).build())
+        );
     }
 
     /**

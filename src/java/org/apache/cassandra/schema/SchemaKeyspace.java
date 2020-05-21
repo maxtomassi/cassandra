@@ -273,8 +273,15 @@ public final class SchemaKeyspace
         return KeyspaceMetadata.create(SchemaConstants.SCHEMA_KEYSPACE_NAME, KeyspaceParams.local(), org.apache.cassandra.schema.Tables.of(ALL_TABLE_METADATA));
     }
 
-    static Collection<Mutation> convertSchemaDiffToMutations(KeyspacesDiff diff, long timestamp)
+    static Collection<Mutation> convertSchemaDiffToMutations(KeyspacesDiff diff, Optional<Long> generation)
     {
+        // If a generation number has been passed as a parameter, we know we want to preserve the
+        // existing user settings at the keyspace level and update the tables definitions based on the
+        // generation number. Therefore, if a generation number is present, always use generation 0
+        // for the keyspace definition itself (name, replication, durability) this ensures that any changes
+        // made to replication by the user will never be overwritten.
+        long timestamp = generation.isPresent() ? 0 : systemClockMicros();
+
         Map<String, Mutation> mutations = new HashMap<>();
 
         diff.created.forEach(k -> mutations.put(k.name, makeCreateKeyspaceMutation(k, timestamp).build()));
@@ -284,6 +291,10 @@ public final class SchemaKeyspace
             KeyspaceMetadata ks = kd.after;
 
             Mutation.SimpleBuilder builder = makeCreateKeyspaceMutation(ks.name, ks.params, timestamp);
+
+            // Now, if the generation is present, set the timestamp to generation, so the tables have the expected timestamp
+            // Otherwise that will be left to the current system timestamp.
+            generation.ifPresent(builder::timestamp);
 
             kd.types.created.forEach(t -> addTypeToSchemaMutation(t, builder));
             kd.types.dropped.forEach(t -> addDropTypeToSchemaMutation(t, builder));
@@ -309,6 +320,11 @@ public final class SchemaKeyspace
         });
 
         return mutations.values();
+    }
+
+    private static long systemClockMicros()
+    {
+        return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
     }
 
     /**

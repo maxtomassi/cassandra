@@ -19,21 +19,24 @@ package org.apache.cassandra.auth;
 
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
-import com.google.common.collect.Iterables;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.datastax.driver.core.Authenticator;
 import com.datastax.driver.core.PlainTextAuthProvider;
-import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.exceptions.AuthenticationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaConstants;
+import org.apache.cassandra.schema.SchemaTransformation;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.schema.TableMetadata;
+import org.assertj.core.util.Lists;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.auth.CassandraRoleManager.*;
 import static org.apache.cassandra.auth.PasswordAuthenticator.*;
 import static org.junit.Assert.assertFalse;
@@ -130,9 +133,16 @@ public class PasswordAuthenticatorTest extends CQLTester
     @BeforeClass
     public static void setUp()
     {
-        SchemaLoader.createKeyspace(SchemaConstants.AUTH_KEYSPACE_NAME,
-                                    KeyspaceParams.simple(1),
-                                    Iterables.toArray(AuthKeyspace.metadata().tables, TableMetadata.class));
+        List<SchemaTransformation> transformations = Lists.newArrayList();
+        transformations.add(SchemaTestUtils.createKeyspace(SchemaConstants.AUTH_KEYSPACE_NAME));
+
+        for (TableMetadata table: AuthKeyspace.metadata().tables)
+        {
+            transformations.add(SchemaTransformations.createTable(table));
+        }
+
+        doSchemaChanges(transformations);
+
         authenticator.setup();
     }
 

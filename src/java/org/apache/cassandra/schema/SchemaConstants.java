@@ -34,6 +34,7 @@ public final class SchemaConstants
 
     public static final String SYSTEM_KEYSPACE_NAME = "system";
     public static final String SCHEMA_KEYSPACE_NAME = "system_schema";
+    public static final String SCHEMA_VIRTUAL_KEYSPACE_NAME = "system_virtual_schema";
     public static final String SYSTEM_VIEWS_KEYSPACE_NAME = "system_views";
 
     public static final String TRACE_KEYSPACE_NAME = "system_traces";
@@ -47,6 +48,10 @@ public final class SchemaConstants
     /* replicate system keyspace names (the ones with a "true" replication strategy) */
     public static final Set<String> REPLICATED_SYSTEM_KEYSPACE_NAMES =
         ImmutableSet.of(TRACE_KEYSPACE_NAME, AUTH_KEYSPACE_NAME, DISTRIBUTED_KEYSPACE_NAME);
+
+    /* virtual keyspace names */
+    public static final Set<String> VIRTUAL_KEYSPACE_NAMES =
+    ImmutableSet.of(SCHEMA_VIRTUAL_KEYSPACE_NAME, SYSTEM_VIEWS_KEYSPACE_NAME);
     /**
      * longest permissible KS or CF name.  Our main concern is that filename not be more than 255 characters;
      * the filename will contain both the KS and CF names. Since non-schema-name components only take up
@@ -71,6 +76,15 @@ public final class SchemaConstants
     }
 
     /**
+     *
+     * @return whether the given keyspace is the local schema keyspace
+     */
+    public static boolean isSchemaKeyspace(String keyspaceName)
+    {
+        return keyspaceName.toLowerCase().equals(SCHEMA_KEYSPACE_NAME);
+    }
+
+    /**
      * @return whether or not the keyspace is a really system one (w/ LocalStrategy, unmodifiable, hardcoded)
      */
     public static boolean isLocalSystemKeyspace(String keyspaceName)
@@ -84,5 +98,20 @@ public final class SchemaConstants
     public static boolean isReplicatedSystemKeyspace(String keyspaceName)
     {
         return REPLICATED_SYSTEM_KEYSPACE_NAMES.contains(keyspaceName.toLowerCase());
+    }
+
+    /**
+     * @return whether or not the keyspace is a virtual keyspace (system_virtual_schema, system_views)
+     */
+    public static boolean isVirtualKeyspace(String keyspaceName)
+    {
+        return VIRTUAL_KEYSPACE_NAMES.contains(keyspaceName.toLowerCase());
+    }
+
+    public static boolean isInternalKeyspace(String keyspaceName)
+    {
+        return isLocalSystemKeyspace(keyspaceName)
+               || isReplicatedSystemKeyspace(keyspaceName)
+               || isVirtualKeyspace(keyspaceName);
     }
 }

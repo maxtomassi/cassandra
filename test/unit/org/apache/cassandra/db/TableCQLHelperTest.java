@@ -44,6 +44,8 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.db.TableCQLHelper.getTableMetadataAsCQL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -97,7 +99,13 @@ public class TableCQLHelperTest extends CQLTester
                          .addRegularColumn("reg3", MapType.getInstance(AsciiType.instance, IntegerType.instance, true))
                          .build();
 
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), Tables.of(cfm), Types.of(typeA, typeB, typeC));
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            SchemaTransformations.createTable(cfm),
+            SchemaTransformations.createType(typeA),
+            SchemaTransformations.createType(typeB),
+            SchemaTransformations.createType(typeC)
+        );
 
         ColumnFamilyStore cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
 
@@ -133,7 +141,10 @@ public class TableCQLHelperTest extends CQLTester
                .recordColumnDrop(reg2, 20000)
                .recordColumnDrop(reg3, 30000);
 
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), builder);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            SchemaTransformations.createTable(builder.build())
+        );
 
         ColumnFamilyStore cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
 
@@ -142,7 +153,7 @@ public class TableCQLHelperTest extends CQLTester
                                       "ALTER TABLE cql_test_keyspace_dropped_columns.test_table_dropped_columns DROP reg2 USING TIMESTAMP 20000;"),
                      TableCQLHelper.getDroppedColumnsAsCQL(cfs.metadata()));
 
-        assertTrue(TableCQLHelper.getTableMetadataAsCQL(cfs.metadata(), true).startsWith(
+        assertTrue(getTableMetadataAsCQL(cfs.metadata(), true).startsWith(
         "CREATE TABLE IF NOT EXISTS cql_test_keyspace_dropped_columns.test_table_dropped_columns (\n" +
         "\tpk1 varint,\n" +
         "\tck1 varint,\n" +
@@ -178,12 +189,15 @@ public class TableCQLHelperTest extends CQLTester
         builder.addColumn(reg1);
         builder.addColumn(reg2);
 
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), builder);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            SchemaTransformations.createTable(builder.build())
+        );
 
         ColumnFamilyStore cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
 
         // when re-adding, column is present in CREATE, then in DROP and then in ADD again, to record DROP with a proper timestamp
-        assertTrue(TableCQLHelper.getTableMetadataAsCQL(cfs.metadata(), true).startsWith(
+        assertTrue(getTableMetadataAsCQL(cfs.metadata(), true).startsWith(
         "CREATE TABLE IF NOT EXISTS cql_test_keyspace_readded_columns.test_table_readded_columns (\n" +
         "\tpk1 varint,\n" +
         "\tck1 varint,\n" +
@@ -205,7 +219,7 @@ public class TableCQLHelperTest extends CQLTester
         String keyspace = "cql_test_keyspace_create_table";
         String table = "test_table_create_table";
 
-        TableMetadata.Builder metadata =
+        TableMetadata metadata =
             TableMetadata.builder(keyspace, table)
                          .addPartitionKeyColumn("pk1", IntegerType.instance)
                          .addPartitionKeyColumn("pk2", AsciiType.instance)
@@ -214,13 +228,17 @@ public class TableCQLHelperTest extends CQLTester
                          .addStaticColumn("st1", AsciiType.instance)
                          .addRegularColumn("reg1", AsciiType.instance)
                          .addRegularColumn("reg2", ListType.getInstance(IntegerType.instance, false))
-                         .addRegularColumn("reg3", MapType.getInstance(AsciiType.instance, IntegerType.instance, true));
+                         .addRegularColumn("reg3", MapType.getInstance(AsciiType.instance, IntegerType.instance, true))
+                         .build();
 
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), metadata);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            SchemaTransformations.createTable(metadata)
+        );
 
         ColumnFamilyStore cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
 
-        assertTrue(TableCQLHelper.getTableMetadataAsCQL(cfs.metadata(), true).startsWith(
+        assertTrue(getTableMetadataAsCQL(cfs.metadata(), true).startsWith(
         "CREATE TABLE IF NOT EXISTS cql_test_keyspace_create_table.test_table_create_table (\n" +
         "\tpk1 varint,\n" +
         "\tpk2 ascii,\n" +
@@ -261,7 +279,10 @@ public class TableCQLHelperTest extends CQLTester
                .recordColumnDrop(ColumnMetadata.regularColumn(keyspace, table, "reg1", AsciiType.instance),
                                  FBUtilities.timestampMicros());
 
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), builder);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            SchemaTransformations.createTable(builder.build())
+        );
 
         ColumnFamilyStore cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
 
@@ -277,7 +298,7 @@ public class TableCQLHelperTest extends CQLTester
         "\tAND additional_write_policy = 'NEVER'\n" +
         "\tAND comment = 'comment'\n" +
         "\tAND caching = { 'keys': 'ALL', 'rows_per_partition': 'NONE' }\n" +
-        "\tAND compaction = { 'max_threshold': '32', 'min_threshold': '4', 'sstable_size_in_mb': '1', 'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy' }\n" +
+        "\tAND compaction = { 'min_threshold': '4', 'max_threshold': '32', 'sstable_size_in_mb': '1', 'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy' }\n" +
         "\tAND compression = { 'chunk_length_in_kb': '64', 'min_compress_ratio': '2.0', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor' }\n" +
         "\tAND cdc = false\n" +
         "\tAND extensions = { 'ext1': 0x76616c31 };"
@@ -320,8 +341,10 @@ public class TableCQLHelperTest extends CQLTester
                                                       IndexMetadata.Kind.CUSTOM,
                                                       Collections.singletonMap(IndexTarget.CUSTOM_INDEX_OPTION_NAME, SASIIndex.class.getName()))));
 
-
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), builder);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            SchemaTransformations.createTable(builder.build())
+        );
 
         ColumnFamilyStore cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
 

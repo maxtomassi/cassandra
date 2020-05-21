@@ -25,6 +25,7 @@ import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.dht.LocalPartitioner;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.KeyspaceMetadata;
+import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 
@@ -32,7 +33,7 @@ import static org.apache.cassandra.schema.TableMetadata.builder;
 
 public final class VirtualSchemaKeyspace extends VirtualKeyspace
 {
-    private static final String NAME = "system_virtual_schema";
+    private static final String NAME = SchemaConstants.SCHEMA_VIRTUAL_KEYSPACE_NAME;
 
     public static final VirtualSchemaKeyspace instance = new VirtualSchemaKeyspace();
 

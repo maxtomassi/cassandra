@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.db.Mutation;
+import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.Message;
 
@@ -44,6 +45,18 @@ public final class SchemaPushVerbHandler implements IVerbHandler<Collection<Muta
         logger.trace("Received schema push request from {}", message.from());
 
         SchemaAnnouncementDiagnostics.schemataMutationsReceived(message.from());
-        Stage.MIGRATION.submit(() -> SchemaManager.instance.mergeAndAnnounceVersion(message.payload));
+        Stage.MIGRATION.submit(() -> legacyMigrationManager(message.from()).apply(message.payload));
+    }
+
+    private MigrationManager legacyMigrationManager(InetAddressAndPort remote)
+    {
+        MigrationManager manager = SchemaManager.instance.legacyMigrationManager();
+        if (manager == null)
+        {
+            logger.warn("Received a legacy schema PUSH request from {} but using {} schema handling",
+                        remote, SchemaManager.instance.updateHandler().name());
+            throw new IllegalStateException();
+        }
+        return manager;
     }
 }

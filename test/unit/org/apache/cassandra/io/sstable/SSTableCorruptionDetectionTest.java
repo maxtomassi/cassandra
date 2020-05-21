@@ -47,6 +47,8 @@ import org.apache.cassandra.io.sstable.format.SSTableWriter;
 import org.apache.cassandra.io.util.*;
 import org.apache.cassandra.schema.*;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -78,16 +80,20 @@ public class SSTableCorruptionDetectionTest extends SSTableWriterTestBase
         // this test writes corrupted data on purpose, disable corrupted tombstone detection
         original = DatabaseDescriptor.getCorruptedTombstoneStrategy();
         DatabaseDescriptor.setCorruptedTombstoneStrategy(Config.CorruptedTombstoneStrategy.disabled);
-        TableMetadata.Builder cfm =
+        TableMetadata cfm =
             TableMetadata.builder(keyspace, table)
                          .addPartitionKeyColumn("pk", AsciiType.instance)
                          .addClusteringColumn("ck1", AsciiType.instance)
                          .addClusteringColumn("ck2", AsciiType.instance)
                          .addRegularColumn("reg1", BytesType.instance)
                          .addRegularColumn("reg2", BytesType.instance)
-                         .compression(CompressionParams.noCompression());
+                         .compression(CompressionParams.noCompression())
+                         .build();
 
-        SchemaLoader.createKeyspace(keyspace, KeyspaceParams.simple(1), cfm);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(keyspace),
+            createTable(cfm)
+        );
 
         cfs = Keyspace.open(keyspace).getColumnFamilyStore(table);
         cfs.disableAutoCompaction();

@@ -20,6 +20,9 @@
  */
 package org.apache.cassandra.db;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
@@ -69,7 +72,6 @@ import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
@@ -110,7 +112,13 @@ public class SinglePartitionSliceCommandTest
                                   .build();
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1), metadata, CFM_SLICES);
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(metadata),
+            createTable(CFM_SLICES)
+        );
+
         v = metadata.getColumn(new ColumnIdentifier("v", true));
         s = metadata.getColumn(new ColumnIdentifier("s", true));
     }

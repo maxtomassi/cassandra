@@ -55,7 +55,6 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.*;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.streaming.PreviewKind;
@@ -66,6 +65,9 @@ import org.apache.cassandra.utils.concurrent.Refs;
 import org.apache.cassandra.UpdateBuilder;
 import org.apache.cassandra.utils.concurrent.Transactional;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.service.ActiveRepairService.NO_PENDING_REPAIR;
 import static org.apache.cassandra.service.ActiveRepairService.UNREPAIRED_SSTABLE;
 import static org.apache.cassandra.Util.assertOnDiskState;
@@ -93,7 +95,11 @@ public class AntiCompactionTest
     {
         SchemaLoader.prepareServer();
         metadata = SchemaLoader.standardCFMD(KEYSPACE1, CF).build();
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1), metadata);
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(metadata)
+        );
+
         cfs = SchemaManager.instance.getColumnFamilyStoreInstance(metadata.id);
         local = InetAddressAndPort.getByName("127.0.0.1");
     }

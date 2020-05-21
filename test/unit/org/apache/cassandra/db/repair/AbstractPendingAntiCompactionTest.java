@@ -42,10 +42,13 @@ import org.apache.cassandra.repair.AbstractRepairTest;
 import org.apache.cassandra.repair.consistent.LocalSessionAccessor;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.schema.Indexes;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ActiveRepairService;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 @Ignore
 public abstract class AbstractPendingAntiCompactionTest
@@ -92,7 +95,12 @@ public abstract class AbstractPendingAntiCompactionTest
 
         TableMetadata cfm2 = CreateTableStatement.parse(String.format("CREATE TABLE %s.%s (k INT PRIMARY KEY, v INT)", ks, tbl2), ks).indexes(indexes.build()).build();
 
-        SchemaLoader.createKeyspace(ks, KeyspaceParams.simple(1), cfm, cfm2);
+        doSchemaChanges(
+            createKeyspace(ks),
+            createTable(cfm),
+            createTable(cfm2)
+        );
+
         cfs = SchemaManager.instance.getColumnFamilyStoreInstance(cfm.id);
         cfs2 = SchemaManager.instance.getColumnFamilyStoreInstance(cfm2.id);
     }
