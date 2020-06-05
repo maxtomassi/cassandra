@@ -213,10 +213,10 @@ class DefaultSchemaUpdateHandler extends SchemaUpdateHandler<DefaultSchema>
     }
 
     @Override
-    void onUpdatedSchemaVersion(InetAddressAndPort remote, UUID newSchemaVersionAsUUID, String reason)
+    void onUpdatedSchemaVersion(InetAddressAndPort remote, UUID newSchemaVersionAsUUID, String releaseVersion)
     {
         // Not certain this can happen anymore but no harm done by ignoring in doubt ...
         if (newSchemaVersionAsUUID != null)
-            migrationManager.maybeScheduleSchemaPull(newSchemaVersionAsUUID, remote, reason);
+            migrationManager.maybeScheduleSchemaPull(newSchemaVersionAsUUID, remote, releaseVersion);
     }
 }

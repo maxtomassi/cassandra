@@ -162,7 +162,7 @@ abstract class SchemaUpdateHandler<S extends Schema>
 
     // TODO: this implementation is not very robust and should be improved
     protected boolean isOnExecutor() {
-        return Thread.currentThread().getName().startsWith(EXECUTOR_STAGE.jmxName);
+        return Thread.currentThread().getName().contains(EXECUTOR_STAGE.jmxName);
     }
 
     /**
@@ -187,7 +187,7 @@ abstract class SchemaUpdateHandler<S extends Schema>
      */
     protected void setInitialSchema(S initialSchema)
     {
-        assert isOnExecutor();
+        assert isOnExecutor() : Thread.currentThread().getName();
         assert currentSchema.isEmpty() : "Current schema: " + currentSchema;
         currentSchema = initialSchema;
         currentSchema.keyspaces().forEach(manager::addNewRefs);

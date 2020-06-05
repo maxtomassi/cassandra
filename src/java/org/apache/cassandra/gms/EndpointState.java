@@ -84,6 +84,11 @@ public class EndpointState
         return applicationState.get().get(key);
     }
 
+    public String getReleaseVersionString()
+    {
+        return getApplicationState(ApplicationState.RELEASE_VERSION).value;
+    }
+
     public Set<Map.Entry<ApplicationState, VersionedValue>> states()
     {
         return applicationState.get().entrySet();

@@ -669,13 +669,13 @@ public final class SchemaManager
      *
      * @param remote the remote node having had a schema change.
      * @param newSchemaVersionAsUUID the new version (as a UUID) of the remote.
-     * @param reason a message described why we call this method, for potential inclusion in message logged.
+     * @param releaseVersion the releaseVersion of the remote endpoint.
      */
     public void onUpdatedSchemaVersion(InetAddressAndPort remote,
-                                                          UUID newSchemaVersionAsUUID,
-                                                          String reason)
+                                       UUID newSchemaVersionAsUUID,
+                                       String releaseVersion)
     {
-        updateHandler.onUpdatedSchemaVersion(remote, newSchemaVersionAsUUID, reason);
+        updateHandler.onUpdatedSchemaVersion(remote, newSchemaVersionAsUUID, releaseVersion);
     }
 
     /**

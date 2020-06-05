@@ -2121,7 +2121,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                     case SCHEMA:
                         SystemKeyspace.updatePeerInfo(endpoint, "schema_version", UUID.fromString(value.value));
                         String reason = String.format("gossip schema version change to %s", value.value);
-                        SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), reason);
+                        SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), epState.getReleaseVersionString());
                         break;
                     case HOST_ID:
                         SystemKeyspace.updatePeerInfo(endpoint, "host_id", UUID.fromString(value.value));
@@ -3015,13 +3015,13 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
 
         if (epState.has(ApplicationState.SCHEMA))
-            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), "endpoint joined");
+            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, epState.getSchemaVersion(), epState.getReleaseVersionString());
     }
 
     public void onAlive(InetAddressAndPort endpoint, EndpointState state)
     {
         if (state.has(ApplicationState.SCHEMA))
-            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, state.getSchemaVersion(), "endpoint alive");
+            SchemaManager.instance.onUpdatedSchemaVersion(endpoint, state.getSchemaVersion(), state.getReleaseVersionString());
 
         if (tokenMetadata.isMember(endpoint))
             notifyUp(endpoint);
