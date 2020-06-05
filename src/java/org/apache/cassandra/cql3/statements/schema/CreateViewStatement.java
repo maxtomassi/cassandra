@@ -37,7 +37,7 @@ import org.apache.cassandra.db.view.View;
 import org.apache.cassandra.exceptions.AlreadyExistsException;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -308,7 +308,7 @@ public final class CreateViewStatement extends AlterSchemaStatement
         ViewMetadata view = new ViewMetadata(table.id, table.name, rawColumns.isEmpty(), whereClause, builder.build());
         view.metadata.validate();
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.views.with(view)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.views.with(view)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

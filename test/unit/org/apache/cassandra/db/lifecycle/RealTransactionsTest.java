@@ -30,8 +30,9 @@ import org.junit.Test;
 
 import org.junit.Assert;
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.schema.TableMetadataRef;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.SerializationHeader;
@@ -44,9 +45,10 @@ import org.apache.cassandra.io.sstable.Descriptor;
 import org.apache.cassandra.io.sstable.SSTableRewriter;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -65,11 +67,13 @@ public class RealTransactionsTest extends SchemaLoader
     public static void setUp()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, REWRITE_FINISHED_CF),
-                                    SchemaLoader.standardCFMD(KEYSPACE, REWRITE_ABORTED_CF),
-                                    SchemaLoader.standardCFMD(KEYSPACE, FLUSH_CF));
+
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, REWRITE_FINISHED_CF).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, REWRITE_ABORTED_CF).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, FLUSH_CF).build())
+        );
     }
 
     @Test
@@ -158,7 +162,7 @@ public class RealTransactionsTest extends SchemaLoader
                 long lastCheckObsoletion = System.nanoTime();
                 File directory = txn.originals().iterator().next().descriptor.directory;
                 Descriptor desc = cfs.newSSTableDescriptor(directory);
-                TableMetadataRef metadata = Schema.instance.getTableMetadataRef(desc);
+                TableMetadataRef metadata = SchemaManager.instance.getTableMetadataRef(desc.ksname, desc.cfname);
                 rewriter.switchWriter(SSTableWriter.create(metadata,
                                                            desc,
                                                            0,

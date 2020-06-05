@@ -36,7 +36,9 @@ import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.RowIndexEntry;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 
 public class SSTableReverseIteratorTest
 {
@@ -47,7 +49,7 @@ public class SSTableReverseIteratorTest
     public static void setupClass()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1));
+        doSchemaChanges(createKeyspace(KEYSPACE));
     }
 
     @Before

@@ -44,8 +44,11 @@ import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 public class RowAndDeletionMergeIteratorTest
@@ -71,7 +74,11 @@ public class RowAndDeletionMergeIteratorTest
                          .addRegularColumn("a", Int32Type.instance);
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1), builder);
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(builder.build())
+        );
     }
 
     @Before

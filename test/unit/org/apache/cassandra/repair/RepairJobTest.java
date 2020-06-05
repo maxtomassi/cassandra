@@ -55,7 +55,6 @@ import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.Verb;
 import org.apache.cassandra.repair.messages.RepairMessage;
 import org.apache.cassandra.repair.messages.SyncRequest;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.PreviewKind;
 import org.apache.cassandra.utils.ByteBufferUtil;
@@ -66,6 +65,9 @@ import org.apache.cassandra.utils.ObjectSizes;
 import org.apache.cassandra.utils.UUIDGen;
 import org.apache.cassandra.utils.asserts.SyncTaskListAssert;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.utils.asserts.SyncTaskAssert.assertThat;
 import static org.apache.cassandra.utils.asserts.SyncTaskListAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -116,9 +118,12 @@ public class RepairJobTest
     public static void setupClass() throws UnknownHostException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, CF));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, CF).build())
+        );
+
         addr1 = InetAddressAndPort.getByName("127.0.0.1");
         addr2 = InetAddressAndPort.getByName("127.0.0.2");
         addr3 = InetAddressAndPort.getByName("127.0.0.3");

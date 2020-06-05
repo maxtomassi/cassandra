@@ -30,6 +30,7 @@ import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.UserType;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Keyspaces;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -56,7 +57,7 @@ public abstract class AlterTypeStatement extends AlterSchemaStatement
         client.ensureKeyspacePermission(keyspaceName, Permission.ALTER);
     }
 
-    SchemaChange schemaChangeEvent(Keyspaces.KeyspacesDiff diff)
+    SchemaChange schemaChangeEvent(KeyspacesDiff diff)
     {
         return new SchemaChange(Change.UPDATED, Target.TYPE, keyspaceName, typeName);
     }
@@ -72,7 +73,7 @@ public abstract class AlterTypeStatement extends AlterSchemaStatement
         if (null == type)
             throw ire("Type %s.%s doesn't exist", keyspaceName, typeName);
 
-        return schema.withAddedOrUpdated(keyspace.withUpdatedUserType(apply(keyspace, type)));
+        return schema.withAddedOrReplaced(keyspace.withUpdatedUserType(apply(keyspace, type)));
     }
 
     abstract UserType apply(KeyspaceMetadata keyspace, UserType type);

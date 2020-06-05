@@ -35,9 +35,9 @@ import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.virtual.AbstractVirtualTable;
 import org.apache.cassandra.db.virtual.SimpleDataSet;
 import org.apache.cassandra.db.virtual.VirtualKeyspace;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.db.virtual.VirtualTable;
 import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.service.StorageServiceMBean;
@@ -117,9 +117,9 @@ public class VirtualTableTest extends CQLTester
         };
         VirtualTable vt2 = new WritableVirtualTable(KS_NAME, VT2_NAME);
 
-        VirtualKeyspaceRegistry.instance.register(new VirtualKeyspace(KS_NAME, ImmutableList.of(vt1, vt2)));
-
         CQLTester.setUpClass();
+
+        SchemaManager.instance.localKeyspaces().load(new VirtualKeyspace(KS_NAME, ImmutableList.of(vt1, vt2)));
     }
 
     @Test

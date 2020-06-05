@@ -32,7 +32,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import javax.management.ListenerNotFoundException;
@@ -71,7 +70,6 @@ import org.apache.cassandra.distributed.api.IMessage;
 import org.apache.cassandra.distributed.api.NodeToolResult;
 import org.apache.cassandra.distributed.mock.nodetool.InternalNodeProbe;
 import org.apache.cassandra.distributed.mock.nodetool.InternalNodeProbeFactory;
-import org.apache.cassandra.distributed.shared.NetworkTopology;
 import org.apache.cassandra.gms.ApplicationState;
 import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.gms.VersionedValue;
@@ -85,7 +83,7 @@ import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.service.CassandraDaemon;
@@ -187,7 +185,7 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
     {
         // we do not use method reference syntax here, because we need to sync on the node-local schema instance
         //noinspection Convert2MethodRef
-        return Schema.instance.getVersion();
+        return SchemaManager.instance.getVersionAsUUID();
     }
 
     public void startup()
@@ -368,7 +366,7 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
                 try
                 {
                     // load schema from disk
-                    Schema.instance.loadFromDisk();
+                    SchemaManager.instance.loadFromDisk();
                 }
                 catch (Exception e)
                 {
@@ -421,9 +419,6 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
 
                 if (config.has(NATIVE_PROTOCOL))
                 {
-                    // Start up virtual table support
-                    CassandraDaemon.getInstanceForTesting().setupVirtualKeyspaces();
-
                     CassandraDaemon.getInstanceForTesting().initializeNativeTransport();
                     CassandraDaemon.getInstanceForTesting().startNativeTransport();
                     StorageService.instance.setRpcReady(true);

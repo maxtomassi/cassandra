@@ -36,8 +36,11 @@ import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.lifecycle.LifecycleTransaction;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.schema.CompactionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class AbstractCompactionStrategyTest
 {
@@ -54,16 +57,24 @@ public class AbstractCompactionStrategyTest
         stcsOptions.put("tombstone_compaction_interval", "1");
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, LCS_TABLE)
-                                                .compaction(CompactionParams.lcs(Collections.emptyMap())),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STCS_TABLE)
-                                                .compaction(CompactionParams.stcs(Collections.emptyMap())),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, DTCS_TABLE)
-                                                .compaction(CompactionParams.create(DateTieredCompactionStrategy.class, Collections.emptyMap())),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, TWCS_TABLE)
-                                                .compaction(CompactionParams.create(TimeWindowCompactionStrategy.class, Collections.emptyMap())));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, LCS_TABLE)
+                                    .compaction(CompactionParams.lcs(Collections.emptyMap()))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, STCS_TABLE)
+                                    .compaction(CompactionParams.stcs(Collections.emptyMap()))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, DTCS_TABLE)
+                                    .compaction(CompactionParams.create(DateTieredCompactionStrategy.class, Collections.emptyMap()))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, TWCS_TABLE)
+                                    .compaction(CompactionParams.create(TimeWindowCompactionStrategy.class, Collections.emptyMap()))
+                                    .build())
+        );
+
         Keyspace.open(KEYSPACE1).getColumnFamilyStore(LCS_TABLE).disableAutoCompaction();
         Keyspace.open(KEYSPACE1).getColumnFamilyStore(STCS_TABLE).disableAutoCompaction();
         Keyspace.open(KEYSPACE1).getColumnFamilyStore(DTCS_TABLE).disableAutoCompaction();

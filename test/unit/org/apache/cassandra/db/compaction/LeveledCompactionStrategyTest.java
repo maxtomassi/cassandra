@@ -60,11 +60,13 @@ import org.apache.cassandra.streaming.PreviewKind;
 import org.apache.cassandra.repair.RepairJobDesc;
 import org.apache.cassandra.repair.Validator;
 import org.apache.cassandra.schema.CompactionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.utils.FBUtilities;
 
 import static java.util.Collections.singleton;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -87,11 +89,13 @@ public class LeveledCompactionStrategyTest
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDDLEVELED)
-                                                .compaction(CompactionParams.lcs(Collections.singletonMap("sstable_size_in_mb", "1"))));
-        }
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDDLEVELED)
+                                    .compaction(CompactionParams.lcs(Collections.singletonMap("sstable_size_in_mb", "1")))
+                                    .build())
+        );
+    }
 
     @Before
     public void enableCompaction()

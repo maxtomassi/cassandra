@@ -30,23 +30,20 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Session;
 import org.apache.cassandra.OrderedJUnit4ClassRunner;
-import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.service.EmbeddedCassandraService;
 import org.apache.cassandra.metrics.DecayingEstimatedHistogramReservoir.EstimatedHistogramReservoirSnapshot;
 
 import static org.apache.cassandra.cql3.statements.BatchStatement.metrics;
 import static org.apache.cassandra.metrics.DecayingEstimatedHistogramReservoir.*;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.quicktheories.QuickTheory.qt;
 import static org.quicktheories.generators.Generate.intArrays;
 import static org.quicktheories.generators.SourceDSL.integers;
 
 @RunWith(OrderedJUnit4ClassRunner.class)
-public class BatchMetricsTest extends SchemaLoader
+public class BatchMetricsTest
 {
     private static final int MAX_ROUNDS_TO_PERFORM = 3;
     private static final int MAX_DISTINCT_PARTITIONS = 128;
@@ -67,8 +64,6 @@ public class BatchMetricsTest extends SchemaLoader
     @BeforeClass()
     public static void setup() throws ConfigurationException, IOException
     {
-        Schema.instance.clear();
-
         cassandra = new EmbeddedCassandraService();
         cassandra.start();
 

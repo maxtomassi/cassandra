@@ -17,6 +17,9 @@
  */
 package org.apache.cassandra.db.partition;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 import java.util.*;
@@ -47,7 +50,6 @@ import org.apache.cassandra.db.partitions.Partition;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.db.rows.Row.Deletion;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.SearchIterator;
 
@@ -78,7 +80,10 @@ public class PartitionImplementationTest
                          .addStaticColumn("static_col", AsciiType.instance)
                          .build();
 
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1), metadata);
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(metadata)
+        );
     }
 
     private List<Row> generateRows()

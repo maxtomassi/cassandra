@@ -29,10 +29,10 @@ import org.apache.cassandra.db.filter.RowFilter;
 import org.apache.cassandra.db.partitions.PartitionIterator;
 import org.apache.cassandra.db.partitions.PartitionIterators;
 import org.apache.cassandra.db.partitions.UnfilteredPartitionIterator;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.db.virtual.VirtualTable;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
 
@@ -139,7 +139,7 @@ public class VirtualTableSinglePartitionReadQuery extends VirtualTableReadQuery 
     @Override
     protected UnfilteredPartitionIterator queryVirtualTable()
     {
-        VirtualTable view = VirtualKeyspaceRegistry.instance.getTableNullable(metadata().id);
+        VirtualTable view = SchemaManager.instance.localKeyspaces().virtualTableInstance(metadata());
         return view.select(partitionKey, clusteringIndexFilter, columnFilter());
     }
 

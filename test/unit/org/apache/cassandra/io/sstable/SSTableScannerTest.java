@@ -46,10 +46,12 @@ import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableReadsListener;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.dht.AbstractBounds.isEmpty;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -63,9 +65,11 @@ public class SSTableScannerTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, TABLE));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE).build())
+        );
     }
 
     private static String toKey(int key)

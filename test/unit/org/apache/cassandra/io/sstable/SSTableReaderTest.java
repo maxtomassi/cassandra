@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileAttribute;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -52,12 +51,14 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.util.FileDataInput;
 import org.apache.cassandra.io.util.MmappedRegions;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FilterFactory;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.cql3.QueryProcessor.executeInternal;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -83,15 +84,18 @@ public class SSTableReaderTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED, true),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLOWINDEXINTERVAL)
-                                                .minIndexInterval(8)
-                                                .maxIndexInterval(256)
-                                                .caching(CachingParams.CACHE_NOTHING));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED, true).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLOWINDEXINTERVAL)
+                                    .minIndexInterval(8)
+                                    .maxIndexInterval(256)
+                                    .caching(CachingParams.CACHE_NOTHING)
+                                    .build())
+        );
     }
 
     @Test

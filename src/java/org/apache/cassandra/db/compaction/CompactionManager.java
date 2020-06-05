@@ -30,6 +30,7 @@ import javax.management.openmbean.TabularData;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 
@@ -44,9 +45,9 @@ import org.apache.cassandra.concurrent.DebuggableThreadPoolExecutor;
 import org.apache.cassandra.concurrent.JMXEnabledThreadPoolExecutor;
 import org.apache.cassandra.concurrent.NamedThreadFactory;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.compaction.CompactionInfo.Holder;
 import org.apache.cassandra.db.lifecycle.ILifecycleTransaction;
@@ -958,7 +959,7 @@ public class CompactionManager implements CompactionManagerMBean
         {
             // extract keyspace and columnfamily name from filename
             Descriptor desc = Descriptor.fromFilename(filename.trim());
-            if (Schema.instance.getTableMetadataRef(desc) == null)
+            if (SchemaManager.instance.getTableMetadataRef(desc.ksname, desc.cfname) == null)
             {
                 logger.warn("Schema does not exist for file {}. Skipping.", filename);
                 continue;
@@ -984,7 +985,7 @@ public class CompactionManager implements CompactionManagerMBean
         {
             // extract keyspace and columnfamily name from filename
             Descriptor desc = Descriptor.fromFilename(filename.trim());
-            if (Schema.instance.getTableMetadataRef(desc) == null)
+            if (SchemaManager.instance.getTableMetadataRef(desc.ksname, desc.cfname) == null)
             {
                 logger.warn("Schema does not exist for file {}. Skipping.", filename);
                 continue;
@@ -1097,7 +1098,7 @@ public class CompactionManager implements CompactionManagerMBean
     /* Used in tests. */
     public void disableAutoCompaction()
     {
-        for (String ksname : Schema.instance.getNonSystemKeyspaces())
+        for (String ksname : SchemaManager.instance.getNonLocalSystemKeyspaces())
         {
             for (ColumnFamilyStore cfs : Keyspace.open(ksname).getColumnFamilyStores())
                 cfs.disableAutoCompaction();
@@ -2169,6 +2170,11 @@ public class CompactionManager implements CompactionManagerMBean
                     compactionHolder.stop();
             }
         }
+    }
+
+    public void interruptCompactionFor(TableMetadata table, boolean interruptValidation)
+    {
+        interruptCompactionFor(Collections.singleton(table), Predicates.alwaysTrue(), true);
     }
 
     public void interruptCompactionForCFs(Iterable<ColumnFamilyStore> cfss, Predicate<SSTableReader> sstablePredicate, boolean interruptValidation)

@@ -52,13 +52,15 @@ import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.FileHandle;
 import org.apache.cassandra.net.AsyncStreamingInputPlus;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.Pair;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.io.util.DataInputPlus.DataInputStreamPlus;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
@@ -78,15 +80,18 @@ public class BigTableZeroCopyWriterTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED, true),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLOWINDEXINTERVAL)
-                                                .minIndexInterval(8)
-                                                .maxIndexInterval(256)
-                                                .caching(CachingParams.CACHE_NOTHING));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED, true).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLOWINDEXINTERVAL)
+                                    .minIndexInterval(8)
+                                    .maxIndexInterval(256)
+                                    .caching(CachingParams.CACHE_NOTHING)
+                                    .build())
+        );
 
         String ks = KEYSPACE1;
         String cf = "Standard1";
@@ -147,7 +152,7 @@ public class BigTableZeroCopyWriterTest
     {
         File dir = store.getDirectories().getDirectoryForNewSSTables();
         Descriptor desc = store.newSSTableDescriptor(dir);
-        TableMetadataRef metadata = Schema.instance.getTableMetadataRef(desc);
+        TableMetadataRef metadata = SchemaManager.instance.getTableMetadataRef(desc.ksname, desc.cfname);
 
         LifecycleTransaction txn = LifecycleTransaction.offline(OperationType.STREAM);
         Set<Component> componentsToWrite = ImmutableSet.of(Component.DATA, Component.PRIMARY_INDEX,

@@ -44,15 +44,17 @@ import org.apache.cassandra.locator.Replica;
 import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.repair.messages.RepairOption;
 import org.apache.cassandra.streaming.PreviewKind;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.concurrent.Refs;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.repair.messages.RepairOption.DATACENTERS_KEY;
 import static org.apache.cassandra.repair.messages.RepairOption.FORCE_REPAIR_KEY;
 import static org.apache.cassandra.repair.messages.RepairOption.HOSTS_KEY;
 import static org.apache.cassandra.repair.messages.RepairOption.INCREMENTAL_KEY;
 import static org.apache.cassandra.repair.messages.RepairOption.RANGES_KEY;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.service.ActiveRepairService.UNREPAIRED_SSTABLE;
 import static org.apache.cassandra.service.ActiveRepairService.getRepairedAt;
 import static org.junit.Assert.assertEquals;
@@ -75,10 +77,12 @@ public class ActiveRepairServiceTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE5,
-                                    KeyspaceParams.simple(2),
-                                    SchemaLoader.standardCFMD(KEYSPACE5, CF_COUNTER),
-                                    SchemaLoader.standardCFMD(KEYSPACE5, CF_STANDARD1));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE5, 2),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE5, CF_COUNTER).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE5, CF_STANDARD1).build())
+        );
     }
 
     @Before

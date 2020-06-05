@@ -37,10 +37,12 @@ import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 import static org.apache.cassandra.Util.dk;
 
@@ -60,26 +62,25 @@ public class CompactionsPurgeTest
     {
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2).build()),
 
-        SchemaLoader.createKeyspace(KEYSPACE2,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD1));
+            createKeyspace(KEYSPACE2),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD1).build()),
 
-        SchemaLoader.createKeyspace(KEYSPACE_CACHED,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHED).caching(CachingParams.CACHE_EVERYTHING));
+            createKeyspace(KEYSPACE_CACHED),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE_CACHED, CF_CACHED).caching(CachingParams.CACHE_EVERYTHING).build()),
 
-        SchemaLoader.createKeyspace(KEYSPACE_CQL,
-                                    KeyspaceParams.simple(1),
-                                    CreateTableStatement.parse("CREATE TABLE " + CF_CQL + " ("
-                                                               + "k int PRIMARY KEY,"
-                                                               + "v1 text,"
-                                                               + "v2 int"
-                                                               + ")", KEYSPACE_CQL));
+            createKeyspace(KEYSPACE_CQL),
+            createTable(CreateTableStatement.parse("CREATE TABLE " + CF_CQL + " ("
+                                                       + "k int PRIMARY KEY,"
+                                                       + "v1 text,"
+                                                       + "v2 int"
+                                                       + ")", KEYSPACE_CQL)
+                                            .build())
+        );
     }
 
     @Test

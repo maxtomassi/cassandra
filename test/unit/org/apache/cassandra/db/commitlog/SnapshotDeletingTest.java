@@ -21,6 +21,10 @@ package org.apache.cassandra.db.commitlog;
 import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 import org.apache.cassandra.SchemaLoader;
@@ -33,7 +37,6 @@ import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.WindowsFailedSnapshotTracker;
 import org.apache.cassandra.io.sstable.SnapshotDeletingTask;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.GCInspector;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
@@ -51,9 +54,11 @@ public class SnapshotDeletingTest
         // Needed to init the output file where we print failed snapshots. This is called on node startup.
         WindowsFailedSnapshotTracker.deleteOldSnapshots();
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build())
+        );
     }
 
     @Test

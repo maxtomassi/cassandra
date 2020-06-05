@@ -35,7 +35,7 @@ import org.apache.cassandra.db.marshal.MapType;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.index.sasi.SASIIndex;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -138,7 +138,7 @@ public final class CreateIndexStatement extends AlterSchemaStatement
         TableMetadata newTable = table.withSwapped(table.indexes.with(index));
         newTable.validate();
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
     }
 
     @Override

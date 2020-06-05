@@ -37,9 +37,11 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.metrics.RestorableMeter;
 import org.apache.cassandra.metrics.StorageMetrics;
 import org.apache.cassandra.schema.CachingParams;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.MigrationManager;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.alterTable;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 
 public class IndexSummaryRedistributionTest
@@ -51,12 +53,15 @@ public class IndexSummaryRedistributionTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD)
-                                                .minIndexInterval(8)
-                                                .maxIndexInterval(256)
-                                                .caching(CachingParams.CACHE_NOTHING));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD)
+                                    .minIndexInterval(8)
+                                    .maxIndexInterval(256)
+                                    .caching(CachingParams.CACHE_NOTHING)
+                                    .build())
+        );
     }
 
     @Test
@@ -88,7 +93,8 @@ public class IndexSummaryRedistributionTest
 
         int originalMinIndexInterval = cfs.metadata().params.minIndexInterval;
         // double the min_index_interval
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().minIndexInterval(originalMinIndexInterval * 2).build(), true);
+        doSchemaChanges(alterTable(ksname, cfname, b -> b.minIndexInterval(originalMinIndexInterval * 2)));
+
         IndexSummaryManager.instance.redistributeSummaries();
 
         long newSize = 0;

@@ -22,7 +22,7 @@ import org.apache.cassandra.audit.AuditLogEntryType;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QualifiedName;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.triggers.TriggerExecutor;
 import org.apache.cassandra.transport.Event.SchemaChange;
@@ -77,7 +77,7 @@ public final class CreateTriggerStatement extends AlterSchemaStatement
         }
 
         TableMetadata newTable = table.withSwapped(table.triggers.with(TriggerMetadata.create(triggerName, triggerClass)));
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.withSwapped(newTable)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

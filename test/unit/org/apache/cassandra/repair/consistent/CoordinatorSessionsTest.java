@@ -29,16 +29,19 @@ import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
 import org.apache.cassandra.repair.AbstractRepairTest;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.repair.messages.FailSession;
 import org.apache.cassandra.repair.messages.FinalizePromise;
 import org.apache.cassandra.repair.messages.PrepareConsistentResponse;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.utils.UUIDGen;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class CoordinatorSessionsTest extends AbstractRepairTest
 {
@@ -104,8 +107,13 @@ public class CoordinatorSessionsTest extends AbstractRepairTest
     {
         SchemaLoader.prepareServer();
         cfm = CreateTableStatement.parse("CREATE TABLE tbl (k INT PRIMARY KEY, v INT)", "coordinatorsessiontest").build();
-        SchemaLoader.createKeyspace("coordinatorsessiontest", KeyspaceParams.simple(1), cfm);
-        cfs = Schema.instance.getColumnFamilyStoreInstance(cfm.id);
+
+        doSchemaChanges(
+            createKeyspace("coordinatorsessiontest"),
+            createTable(cfm)
+        );
+
+        cfs = SchemaManager.instance.getColumnFamilyStoreInstance(cfm.id);
     }
 
     private static UUID registerSession()

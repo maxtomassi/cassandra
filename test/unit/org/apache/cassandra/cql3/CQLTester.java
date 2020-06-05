@@ -48,8 +48,6 @@ import com.datastax.driver.core.ResultSet;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.audit.AuditLogManager;
 import org.apache.cassandra.concurrent.ScheduledExecutors;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
-import org.apache.cassandra.db.virtual.VirtualSchemaKeyspace;
 import org.apache.cassandra.index.SecondaryIndexManager;
 import org.apache.cassandra.config.EncryptionOptions;
 import org.apache.cassandra.locator.InetAddressAndPort;
@@ -407,7 +405,6 @@ public abstract class CQLTester
             return;
 
         SystemKeyspace.finishStartup();
-        VirtualKeyspaceRegistry.instance.register(VirtualSchemaKeyspace.instance);
 
         StorageService.instance.initServer();
         SchemaLoader.startGossiper();
@@ -764,7 +761,7 @@ public abstract class CQLTester
                         ? IndexMetadata.generateDefaultIndexName(table)
                         : IndexMetadata.generateDefaultIndexName(table, new ColumnIdentifier(column, true));
 
-        KeyspaceMetadata ks = Schema.instance.getKeyspaceMetadata(keyspace);
+        KeyspaceMetadata ks = SchemaManager.instance.getKeyspaceMetadata(keyspace);
         return ks.findAvailableIndexName(baseName);
     }
 
@@ -880,7 +877,7 @@ public abstract class CQLTester
 
     protected TableMetadata currentTableMetadata()
     {
-        return Schema.instance.getTableMetadata(KEYSPACE, currentTable());
+        return SchemaManager.instance.getTableMetadata(KEYSPACE, currentTable());
     }
 
     protected com.datastax.driver.core.ResultSet executeNet(ProtocolVersion protocolVersion, String query, Object... values) throws Throwable

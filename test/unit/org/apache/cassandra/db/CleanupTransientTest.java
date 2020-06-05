@@ -45,8 +45,10 @@ import org.apache.cassandra.service.PendingRangeCalculatorService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class CleanupTransientTest
 {
@@ -77,10 +79,12 @@ public class CleanupTransientTest
         DatabaseDescriptor.setTransientReplicationEnabledUnsafe(true);
         oldPartitioner = StorageService.instance.setPartitionerUnsafe(partitioner);
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple("2/1"),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED1, true));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1, KeyspaceParams.simple("2/1")),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED1, true).build())
+        );
 
         StorageService ss = StorageService.instance;
         final int RING_SIZE = 2;

@@ -46,7 +46,7 @@ import org.apache.cassandra.metrics.KeyspaceMetrics;
 import org.apache.cassandra.repair.KeyspaceRepairManager;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.ReplicationParams;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
@@ -112,18 +112,18 @@ public class Keyspace
     public static Keyspace open(String keyspaceName)
     {
         assert initialized || SchemaConstants.isLocalSystemKeyspace(keyspaceName);
-        return open(keyspaceName, Schema.instance, true);
+        return open(keyspaceName, SchemaManager.instance, true);
     }
 
     // to only be used by org.apache.cassandra.tools.Standalone* classes
     public static Keyspace openWithoutSSTables(String keyspaceName)
     {
-        return open(keyspaceName, Schema.instance, false);
+        return open(keyspaceName, SchemaManager.instance, false);
     }
 
-    private static Keyspace open(String keyspaceName, Schema schema, boolean loadSSTables)
+    private static Keyspace open(String keyspaceName, SchemaManager schemaManager, boolean loadSSTables)
     {
-        Keyspace keyspaceInstance = schema.getKeyspaceInstance(keyspaceName);
+        Keyspace keyspaceInstance = schemaManager.getKeyspaceInstance(keyspaceName);
 
         if (keyspaceInstance == null)
         {
@@ -131,12 +131,12 @@ public class Keyspace
             // per keyspace, so we synchronize and re-check before doing it.
             synchronized (Keyspace.class)
             {
-                keyspaceInstance = schema.getKeyspaceInstance(keyspaceName);
+                keyspaceInstance = schemaManager.getKeyspaceInstance(keyspaceName);
                 if (keyspaceInstance == null)
                 {
                     // open and store the keyspace
                     keyspaceInstance = new Keyspace(keyspaceName, loadSSTables);
-                    schema.storeKeyspaceInstance(keyspaceInstance);
+                    schemaManager.storeKeyspaceInstance(keyspaceInstance);
                 }
             }
         }
@@ -145,14 +145,14 @@ public class Keyspace
 
     public static Keyspace clear(String keyspaceName)
     {
-        return clear(keyspaceName, Schema.instance);
+        return clear(keyspaceName, SchemaManager.instance);
     }
 
-    public static Keyspace clear(String keyspaceName, Schema schema)
+    public static Keyspace clear(String keyspaceName, SchemaManager schemaManager)
     {
         synchronized (Keyspace.class)
         {
-            Keyspace t = schema.removeKeyspaceInstance(keyspaceName);
+            Keyspace t = schemaManager.removeKeyspaceInstance(keyspaceName);
             if (t != null)
             {
                 for (ColumnFamilyStore cfs : t.getColumnFamilyStores())
@@ -207,7 +207,7 @@ public class Keyspace
 
     public ColumnFamilyStore getColumnFamilyStore(String cfName)
     {
-        TableMetadata table = Schema.instance.getTableMetadata(getName(), cfName);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(getName(), cfName);
         if (table == null)
             throw new IllegalArgumentException(String.format("Unknown keyspace/cf pair (%s.%s)", getName(), cfName));
         return getColumnFamilyStore(table.id);
@@ -326,7 +326,7 @@ public class Keyspace
 
     private Keyspace(String keyspaceName, boolean loadSSTables)
     {
-        metadata = Schema.instance.getKeyspaceMetadata(keyspaceName);
+        metadata = SchemaManager.instance.getKeyspaceMetadata(keyspaceName);
         assert metadata != null : "Unknown keyspace " + keyspaceName;
         if (metadata.isVirtual())
             throw new IllegalStateException("Cannot initialize Keyspace with virtual metadata " + keyspaceName);
@@ -337,7 +337,7 @@ public class Keyspace
         for (TableMetadata cfm : metadata.tablesAndViews())
         {
             logger.trace("Initializing {}.{}", getName(), cfm.name);
-            initCf(Schema.instance.getTableMetadataRef(cfm.id), loadSSTables);
+            initCf(SchemaManager.instance.getTableMetadataRef(cfm.id), loadSSTables);
         }
         this.viewManager.reload(false);
 
@@ -743,17 +743,17 @@ public class Keyspace
 
     public static Iterable<Keyspace> all()
     {
-        return Iterables.transform(Schema.instance.getKeyspaces(), keyspaceTransformer);
+        return Iterables.transform(SchemaManager.instance.getAllKeyspaces(), keyspaceTransformer);
     }
 
     public static Iterable<Keyspace> nonSystem()
     {
-        return Iterables.transform(Schema.instance.getNonSystemKeyspaces(), keyspaceTransformer);
+        return Iterables.transform(SchemaManager.instance.getNonLocalSystemKeyspaces(), keyspaceTransformer);
     }
 
     public static Iterable<Keyspace> nonLocalStrategy()
     {
-        return Iterables.transform(Schema.instance.getNonLocalStrategyKeyspaces(), keyspaceTransformer);
+        return Iterables.transform(SchemaManager.instance.getNonLocalStrategyKeyspaces(), keyspaceTransformer);
     }
 
     public static Iterable<Keyspace> system()

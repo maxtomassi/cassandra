@@ -35,13 +35,11 @@ import com.datastax.driver.core.*;
 import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.Policies;
 import com.datastax.driver.core.utils.Bytes;
-import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.service.EmbeddedCassandraService;
 
-public class CorruptionTest extends SchemaLoader
+public class CorruptionTest
 {
 
     private static EmbeddedCassandraService cassandra;
@@ -59,8 +57,6 @@ public class CorruptionTest extends SchemaLoader
     @BeforeClass()
     public static void setup() throws ConfigurationException, IOException
     {
-        Schema.instance.clear();
-
         cassandra = new EmbeddedCassandraService();
         cassandra.start();
 

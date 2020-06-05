@@ -26,17 +26,15 @@ import java.util.concurrent.*;
 
 import org.apache.cassandra.UpdateBuilder;
 import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.io.util.DataOutputBufferFixed;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.results.Result;
@@ -44,6 +42,10 @@ import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -87,17 +89,19 @@ public class MutationBench
     @Setup
     public void setup() throws IOException
     {
-        Schema.instance.load(KeyspaceMetadata.create(keyspace, KeyspaceParams.simple(1)));
-        KeyspaceMetadata ksm = Schema.instance.getKeyspaceMetadata(keyspace);
-        TableMetadata metadata =
-            CreateTableStatement.parse("CREATE TABLE userpics " +
-                                       "( userid bigint," +
-                                       "picid bigint," +
-                                       "commentid bigint, " +
-                                       "PRIMARY KEY(userid, picid))", keyspace)
-                                .build();
+        String tableName = "userpics";
 
-        Schema.instance.load(ksm.withSwapped(ksm.tables.with(metadata)));
+        doSchemaChanges(
+            createKeyspace(keyspace),
+            createTable(CreateTableStatement.parse("CREATE TABLE " + tableName +" ("+
+                                                   "userid bigint," +
+                                                   "picid bigint," +
+                                                   "commentid bigint, " +
+                                                   "PRIMARY KEY(userid, picid))", keyspace)
+                                            .build())
+        );
+
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(keyspace, tableName);
 
         mutation = (Mutation)UpdateBuilder.create(metadata, 1L).newRow(1L).add("commentid", 32L).makeMutation();
         buffer = ByteBuffer.allocate(mutation.serializedSize(MessagingService.current_version));

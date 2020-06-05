@@ -48,8 +48,8 @@ import org.apache.cassandra.net.Message;
 import org.apache.cassandra.repair.AbstractRepairTest;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.repair.KeyspaceRepairManager;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
@@ -63,12 +63,14 @@ import org.apache.cassandra.repair.messages.PrepareConsistentResponse;
 import org.apache.cassandra.repair.messages.RepairMessage;
 import org.apache.cassandra.repair.messages.StatusRequest;
 import org.apache.cassandra.repair.messages.StatusResponse;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.repair.consistent.ConsistentSession.State.*;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class LocalSessionTest extends AbstractRepairTest
 {
@@ -212,8 +214,13 @@ public class LocalSessionTest extends AbstractRepairTest
     {
         SchemaLoader.prepareServer();
         cfm = CreateTableStatement.parse("CREATE TABLE tbl (k INT PRIMARY KEY, v INT)", "localsessiontest").build();
-        SchemaLoader.createKeyspace("localsessiontest", KeyspaceParams.simple(1), cfm);
-        cfs = Schema.instance.getColumnFamilyStoreInstance(cfm.id);
+
+        doSchemaChanges(
+            createKeyspace("localsessiontest"),
+            createTable(cfm)
+        );
+
+        cfs = SchemaManager.instance.getColumnFamilyStoreInstance(cfm.id);
     }
 
     @Before

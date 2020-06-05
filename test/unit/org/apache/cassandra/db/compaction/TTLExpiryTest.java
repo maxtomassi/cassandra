@@ -30,7 +30,9 @@ import org.junit.runner.RunWith;
 
 import org.apache.cassandra.OrderedJUnit4ClassRunner;
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.filter.ColumnFilter;
@@ -41,11 +43,11 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableReadsListener;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.tools.SSTableExpiredBlockers;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.SchemaTestUtils.updateGCGrace;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -63,19 +65,23 @@ public class TTLExpiryTest
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    TableMetadata.builder(KEYSPACE1, CF_STANDARD1)
-                                                 .addPartitionKeyColumn("pKey", AsciiType.instance)
-                                                 .addRegularColumn("col1", AsciiType.instance)
-                                                 .addRegularColumn("col", AsciiType.instance)
-                                                 .addRegularColumn("col311", AsciiType.instance)
-                                                 .addRegularColumn("col2", AsciiType.instance)
-                                                 .addRegularColumn("col3", AsciiType.instance)
-                                                 .addRegularColumn("col7", AsciiType.instance)
-                                                 .addRegularColumn("col8", MapType.getInstance(AsciiType.instance, AsciiType.instance, true))
-                                                 .addRegularColumn("shadow", AsciiType.instance)
-                                                 .gcGraceSeconds(0));
+        TableMetadata table = TableMetadata.builder(KEYSPACE1, CF_STANDARD1)
+                                           .addPartitionKeyColumn("pKey", AsciiType.instance)
+                                           .addRegularColumn("col1", AsciiType.instance)
+                                           .addRegularColumn("col", AsciiType.instance)
+                                           .addRegularColumn("col311", AsciiType.instance)
+                                           .addRegularColumn("col2", AsciiType.instance)
+                                           .addRegularColumn("col3", AsciiType.instance)
+                                           .addRegularColumn("col7", AsciiType.instance)
+                                           .addRegularColumn("col8", MapType.getInstance(AsciiType.instance, AsciiType.instance, true))
+                                           .addRegularColumn("shadow", AsciiType.instance)
+                                           .gcGraceSeconds(0)
+                                           .build();
+
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KEYSPACE1),
+            SchemaTransformations.createTable(table)
+        );
     }
 
     @Test
@@ -83,7 +89,8 @@ public class TTLExpiryTest
     {
         ColumnFamilyStore cfs = Keyspace.open(KEYSPACE1).getColumnFamilyStore("Standard1");
         cfs.disableAutoCompaction();
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(0).build(), true);
+        doSchemaChanges(updateGCGrace(cfs.metadata(), 0));
+
         String key = "ttl";
         new RowUpdateBuilder(cfs.metadata(), 1L, 1, key)
                     .add("col1", ByteBufferUtil.EMPTY_BYTE_BUFFER)
@@ -164,7 +171,8 @@ public class TTLExpiryTest
         cfs.truncateBlocking();
         cfs.disableAutoCompaction();
         // To reproduce #10944, we need our gcBefore to be equal to the locaDeletionTime. A gcGrace of 1 will (almost always) give us that.
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(force10944Bug ? 1 : 0).build(), true);
+        doSchemaChanges(updateGCGrace(cfs.metadata(), force10944Bug ? 1 : 0));
+
         long timestamp = System.currentTimeMillis();
         String key = "ttl";
         new RowUpdateBuilder(cfs.metadata(), timestamp, 1, key)
@@ -212,7 +220,7 @@ public class TTLExpiryTest
         ColumnFamilyStore cfs = Keyspace.open(KEYSPACE1).getColumnFamilyStore("Standard1");
         cfs.truncateBlocking();
         cfs.disableAutoCompaction();
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(0).build(), true);
+        doSchemaChanges(updateGCGrace(cfs.metadata(), 0));
         long timestamp = System.currentTimeMillis();
         String key = "ttl";
         new RowUpdateBuilder(cfs.metadata(), timestamp, 1, key)
@@ -262,7 +270,7 @@ public class TTLExpiryTest
         ColumnFamilyStore cfs = Keyspace.open(KEYSPACE1).getColumnFamilyStore("Standard1");
         cfs.truncateBlocking();
         cfs.disableAutoCompaction();
-        MigrationManager.announceTableUpdate(cfs.metadata().unbuild().gcGraceSeconds(0).build(), true);
+        doSchemaChanges(updateGCGrace(cfs.metadata(), 0));
 
         new RowUpdateBuilder(cfs.metadata(), System.currentTimeMillis(), "test")
                 .noRowMarker()

@@ -34,6 +34,7 @@ import org.junit.runner.RunWith;
 
 import org.apache.cassandra.OrderedJUnit4ClassRunner;
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.db.Clustering;
@@ -73,12 +74,15 @@ import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.metadata.StatsMetadata;
 import org.apache.cassandra.schema.CompactionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.SchemaTestUtils.updateGCGrace;
+import static org.apache.cassandra.schema.SchemaTransformations.alterTable;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -108,19 +112,23 @@ public class CompactionsTest
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.denseCFMD(KEYSPACE1, CF_DENSE1)
-                                                .compaction(CompactionParams.stcs(compactionOptions)),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1)
-                                                .compaction(CompactionParams.stcs(compactionOptions)),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD3),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD4),
-                                    SchemaLoader.superCFMD(KEYSPACE1, CF_SUPER1, AsciiType.instance),
-                                    SchemaLoader.superCFMD(KEYSPACE1, CF_SUPER5, AsciiType.instance),
-                                    SchemaLoader.superCFMD(KEYSPACE1, CF_SUPERGC, AsciiType.instance)
-                                                .gcGraceSeconds(0));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.denseCFMD(KEYSPACE1, CF_DENSE1)
+                                    .compaction(CompactionParams.stcs(compactionOptions))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1)
+                                    .compaction(CompactionParams.stcs(compactionOptions))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD3).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD4).build()),
+            createTable(SchemaLoader.superCFMD(KEYSPACE1, CF_SUPER1, AsciiType.instance).build()),
+            createTable(SchemaLoader.superCFMD(KEYSPACE1, CF_SUPER5, AsciiType.instance).build()),
+            createTable(SchemaLoader.superCFMD(KEYSPACE1, CF_SUPERGC, AsciiType.instance)
+                                    .gcGraceSeconds(0)
+                                    .build())
+        );
     }
 
     public static long populate(String ks, String cf, int startRowKey, int endRowKey, int ttl)
@@ -149,7 +157,7 @@ public class CompactionsTest
         Keyspace keyspace = Keyspace.open(KEYSPACE1);
         ColumnFamilyStore store = keyspace.getColumnFamilyStore(CF_DENSE1);
         store.clearUnsafe();
-        MigrationManager.announceTableUpdate(store.metadata().unbuild().gcGraceSeconds(1).build(), true);
+        doSchemaChanges(updateGCGrace(store.metadata(), 1));
 
         // disable compaction while flushing
         store.disableAutoCompaction();
@@ -229,7 +237,10 @@ public class CompactionsTest
         ColumnFamilyStore store = keyspace.getColumnFamilyStore(CF_STANDARD1);
         store.clearUnsafe();
 
-        MigrationManager.announceTableUpdate(store.metadata().unbuild().gcGraceSeconds(1).compaction(CompactionParams.stcs(compactionOptions)).build(), true);
+        doSchemaChanges(alterTable(keyspace.getName(),
+                                   store.getTableName(),
+                                   b -> b.gcGraceSeconds(1)
+                                         .compaction(CompactionParams.stcs(compactionOptions))));
 
         // disable compaction while flushing
         store.disableAutoCompaction();
@@ -272,7 +283,10 @@ public class CompactionsTest
 
         // now let's enable the magic property
         compactionOptions.put("unchecked_tombstone_compaction", "true");
-        MigrationManager.announceTableUpdate(store.metadata().unbuild().gcGraceSeconds(1).compaction(CompactionParams.stcs(compactionOptions)).build(), true);
+        doSchemaChanges(alterTable(keyspace.getName(),
+                                   store.getTableName(),
+                                   b -> b.gcGraceSeconds(1)
+                                         .compaction(CompactionParams.stcs(compactionOptions))));
 
         //submit background task again and wait for it to complete
         FBUtilities.waitOnFutures(CompactionManager.instance.submitBackground(store));

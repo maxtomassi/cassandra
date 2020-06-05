@@ -25,6 +25,7 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.cql3.Operator;
@@ -42,6 +43,9 @@ import org.apache.cassandra.utils.FBUtilities;
 
 import org.junit.*;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
+
 public class OperationTest extends SchemaLoader
 {
     private static final String KS_NAME = "sasi";
@@ -58,11 +62,13 @@ public class OperationTest extends SchemaLoader
     {
         System.setProperty("cassandra.config", "cassandra-murmur.yaml");
         SchemaLoader.loadSchema();
-        SchemaLoader.createKeyspace(KS_NAME,
-                                    KeyspaceParams.simpleTransient(1),
-                                    SchemaLoader.sasiCFMD(KS_NAME, CF_NAME),
-                                    SchemaLoader.clusteringSASICFMD(KS_NAME, CLUSTERING_CF_NAME),
-                                    SchemaLoader.staticSASICFMD(KS_NAME, STATIC_CF_NAME));
+
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KS_NAME, KeyspaceParams.simpleTransient(1)),
+            createTable(SchemaLoader.sasiCFMD(KS_NAME, CF_NAME).build()),
+            createTable(SchemaLoader.clusteringSASICFMD(KS_NAME, CLUSTERING_CF_NAME).build()),
+            createTable(SchemaLoader.staticSASICFMD(KS_NAME, STATIC_CF_NAME).build())
+        );
 
         BACKEND = Keyspace.open(KS_NAME).getColumnFamilyStore(CF_NAME);
         CLUSTERING_BACKEND = Keyspace.open(KS_NAME).getColumnFamilyStore(CLUSTERING_CF_NAME);

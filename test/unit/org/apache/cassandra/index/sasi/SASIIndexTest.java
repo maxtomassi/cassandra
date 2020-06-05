@@ -40,7 +40,7 @@ import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.index.Index;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.Term;
@@ -89,6 +89,9 @@ import org.junit.Assert;
 import org.junit.*;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class SASIIndexTest
 {
@@ -110,13 +113,15 @@ public class SASIIndexTest
     public static void loadSchema() throws ConfigurationException
     {
         SchemaLoader.loadSchema();
-        SchemaLoader.createKeyspace(KS_NAME,
-                                    KeyspaceParams.simpleTransient(1),
-                                    SchemaLoader.sasiCFMD(KS_NAME, CF_NAME),
-                                    SchemaLoader.clusteringSASICFMD(KS_NAME, CLUSTERING_CF_NAME_1),
-                                    SchemaLoader.clusteringSASICFMD(KS_NAME, CLUSTERING_CF_NAME_2, "location"),
-                                    SchemaLoader.staticSASICFMD(KS_NAME, STATIC_CF_NAME),
-                                    SchemaLoader.fullTextSearchSASICFMD(KS_NAME, FTS_CF_NAME));
+
+        doSchemaChanges(
+            createKeyspace(KS_NAME, KeyspaceParams.simpleTransient(1)),
+            createTable(SchemaLoader.sasiCFMD(KS_NAME, CF_NAME).build()),
+            createTable(SchemaLoader.clusteringSASICFMD(KS_NAME, CLUSTERING_CF_NAME_1).build()),
+            createTable(SchemaLoader.clusteringSASICFMD(KS_NAME, CLUSTERING_CF_NAME_2, "location").build()),
+            createTable(SchemaLoader.staticSASICFMD(KS_NAME, STATIC_CF_NAME).build()),
+            createTable(SchemaLoader.fullTextSearchSASICFMD(KS_NAME, FTS_CF_NAME).build())
+        );
     }
 
     @Before
@@ -2452,7 +2457,7 @@ public class SASIIndexTest
                                                          KS_NAME,
                                                          TABLE_NAME));
 
-        Columns regulars = Schema.instance.getTableMetadata(KS_NAME, TABLE_NAME).regularColumns();
+        Columns regulars = SchemaManager.instance.getTableMetadata(KS_NAME, TABLE_NAME).regularColumns();
         List<String> allColumns = regulars.stream().map(ColumnMetadata::toString).collect(Collectors.toList());
         List<String> textColumns = Arrays.asList("text_v", "ascii_v", "varchar_v");
 

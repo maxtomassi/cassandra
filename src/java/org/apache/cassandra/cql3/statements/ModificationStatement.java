@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.ViewMetadata;
 import org.apache.cassandra.cql3.*;
@@ -877,7 +877,7 @@ public abstract class ModificationStatement implements CQLStatement
 
         public ModificationStatement prepare(VariableSpecifications bindVariables)
         {
-            TableMetadata metadata = Schema.instance.validateTable(keyspace(), name());
+            TableMetadata metadata = SchemaManager.instance.validateTableForUserQuery(keyspace(), name());
 
             Attributes preparedAttributes = attrs.prepare(keyspace(), name());
             preparedAttributes.collectMarkerSpecification(bindVariables);

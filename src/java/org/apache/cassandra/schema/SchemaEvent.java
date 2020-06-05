@@ -29,7 +29,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 
@@ -53,7 +52,7 @@ public final class SchemaEvent extends DiagnosticEvent
     @Nullable
     private final KeyspaceMetadata previous;
     @Nullable
-    private final KeyspaceMetadata.KeyspaceDiff ksDiff;
+    private final KeyspaceMetadata.Diff ksDiff;
     @Nullable
     private final TableMetadata tableUpdate;
     @Nullable
@@ -87,8 +86,8 @@ public final class SchemaEvent extends DiagnosticEvent
         SCHEMATA_CLEARED
     }
 
-    SchemaEvent(SchemaEventType type, Schema schema, @Nullable KeyspaceMetadata ksUpdate,
-                @Nullable KeyspaceMetadata previous, @Nullable KeyspaceMetadata.KeyspaceDiff ksDiff,
+    SchemaEvent(SchemaEventType type, SchemaManager schemaManager, @Nullable KeyspaceMetadata ksUpdate,
+                @Nullable KeyspaceMetadata previous, @Nullable KeyspaceMetadata.Diff ksDiff,
                 @Nullable TableMetadata tableUpdate, @Nullable Tables.TablesDiff tablesDiff,
                 @Nullable Views.ViewsDiff viewsDiff, @Nullable MapDifference<String,TableMetadata> indexesDiff)
     {
@@ -101,13 +100,13 @@ public final class SchemaEvent extends DiagnosticEvent
         this.viewsDiff = viewsDiff;
         this.indexesDiff = indexesDiff;
 
-        this.keyspaces = new HashSet<>(schema.getKeyspaces());
-        this.nonSystemKeyspaces = new ArrayList<>(schema.getNonSystemKeyspaces());
-        this.userKeyspaces = new ArrayList<>(schema.getUserKeyspaces());
-        this.numberOfTables = schema.getNumberOfTables();
-        this.version = schema.getVersion();
+        this.keyspaces = new HashSet<>(schemaManager.getAllKeyspaces());
+        this.nonSystemKeyspaces = new ArrayList<>(schemaManager.getNonLocalSystemKeyspaces());
+        this.userKeyspaces = new ArrayList<>(schemaManager.getUserKeyspaces());
+        this.numberOfTables = schemaManager.getNumberOfTables();
+        this.version = schemaManager.getVersionAsUUID();
 
-        Map<Pair<String, String>, TableMetadataRef> indexTableMetadataRefs = schema.getIndexTableMetadataRefs();
+        Map<Pair<String, String>, TableMetadataRef> indexTableMetadataRefs = schemaManager.getIndexTableMetadataRefs();
         Map<String, String> indexTables = indexTableMetadataRefs.entrySet().stream()
                                                                 .collect(Collectors.toMap(e -> e.getKey().left + ',' +
                                                                                                e.getKey().right,
@@ -115,7 +114,7 @@ public final class SchemaEvent extends DiagnosticEvent
                                                                                                e.getValue().keyspace + ',' +
                                                                                                e.getValue().name));
         this.indexTables = new HashMap<>(indexTables);
-        Map<TableId, TableMetadataRef> tableMetadataRefs = schema.getTableMetadataRefs();
+        Map<TableId, TableMetadataRef> tableMetadataRefs = schemaManager.getTableMetadataRefs();
         Map<String, String> tables = tableMetadataRefs.entrySet().stream()
                                                       .collect(Collectors.toMap(e -> e.getKey().toHexString(),
                                                                                 e -> e.getValue().id.toHexString() + ',' +

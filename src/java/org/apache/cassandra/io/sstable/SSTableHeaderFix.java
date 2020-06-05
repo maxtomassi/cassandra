@@ -32,7 +32,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,7 +57,7 @@ import org.apache.cassandra.io.sstable.metadata.MetadataComponent;
 import org.apache.cassandra.io.sstable.metadata.MetadataType;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
@@ -102,9 +101,7 @@ public abstract class SSTableHeaderFix
                     previousVersionString,
                     FBUtilities.getReleaseVersionString());
 
-        SSTableHeaderFix instance = SSTableHeaderFix.builder()
-                                                    .schemaCallback(() -> Schema.instance::getTableMetadata)
-                                                    .build();
+        SSTableHeaderFix instance = SSTableHeaderFix.builder().build();
         instance.execute();
     }
 
@@ -129,7 +126,7 @@ public abstract class SSTableHeaderFix
         this.warn = builder.warn;
         this.error = builder.error;
         this.dryRun = builder.dryRun;
-        this.schemaCallback = builder.schemaCallback.get();
+        this.schemaCallback = builder.schemaCallback;
         this.descriptors = new ArrayList<>(builder.descriptors);
         Objects.requireNonNull(this.info, "info is null");
         Objects.requireNonNull(this.warn, "warn is null");
@@ -161,7 +158,8 @@ public abstract class SSTableHeaderFix
         private Consumer<String> warn = (ln) -> logger.warn("{}", ln);
         private Consumer<String> error = (ln) -> logger.error("{}", ln);
         private boolean dryRun;
-        private Supplier<Function<Descriptor, TableMetadata>> schemaCallback = () -> null;
+        private Function<Descriptor, TableMetadata> schemaCallback =
+                desc -> SchemaManager.instance.getTableMetadata(desc.ksname, desc.cfname);
 
         private Builder()
         {}
@@ -218,7 +216,7 @@ public abstract class SSTableHeaderFix
          * Schema callback to retrieve the schema of a table. Production code always delegates to the
          * live schema ({@code Schema.instance}). Unit tests use this method to feed a custom schema.
          */
-        public Builder schemaCallback(Supplier<Function<Descriptor, TableMetadata>> schemaCallback)
+        public Builder schemaCallback(Function<Descriptor, TableMetadata> schemaCallback)
         {
             this.schemaCallback = schemaCallback;
             return this;

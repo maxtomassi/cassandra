@@ -24,7 +24,6 @@ import org.apache.cassandra.OrderedJUnit4ClassRunner;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.cache.ChunkCache;
 import org.apache.cassandra.UpdateBuilder;
-import org.apache.cassandra.db.compaction.AbstractCompactionStrategy;
 import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.compaction.Verifier;
 import org.apache.cassandra.db.marshal.UUIDType;
@@ -35,7 +34,6 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.io.FSWriteError;
-import org.apache.cassandra.io.compress.CorruptBlockException;
 import org.apache.cassandra.io.sstable.Component;
 import org.apache.cassandra.io.sstable.CorruptSSTableException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
@@ -43,7 +41,6 @@ import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.schema.CompressionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -52,7 +49,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.*;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,9 +58,11 @@ import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 
 import static org.apache.cassandra.SchemaLoader.counterCFMD;
-import static org.apache.cassandra.SchemaLoader.createKeyspace;
 import static org.apache.cassandra.SchemaLoader.loadSchema;
 import static org.apache.cassandra.SchemaLoader.standardCFMD;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -94,21 +92,24 @@ public class VerifyTest
         CompressionParams compressionParameters = CompressionParams.snappy(32768);
 
         loadSchema();
-        createKeyspace(KEYSPACE,
-                       KeyspaceParams.simple(1),
-                       standardCFMD(KEYSPACE, CF).compression(compressionParameters),
-                       standardCFMD(KEYSPACE, CF2).compression(compressionParameters),
-                       standardCFMD(KEYSPACE, CF3),
-                       standardCFMD(KEYSPACE, CF4),
-                       standardCFMD(KEYSPACE, CORRUPT_CF),
-                       standardCFMD(KEYSPACE, CORRUPT_CF2),
-                       counterCFMD(KEYSPACE, COUNTER_CF).compression(compressionParameters),
-                       counterCFMD(KEYSPACE, COUNTER_CF2).compression(compressionParameters),
-                       counterCFMD(KEYSPACE, COUNTER_CF3),
-                       counterCFMD(KEYSPACE, COUNTER_CF4),
-                       counterCFMD(KEYSPACE, CORRUPTCOUNTER_CF),
-                       counterCFMD(KEYSPACE, CORRUPTCOUNTER_CF2),
-                       standardCFMD(KEYSPACE, CF_UUID, 0, UUIDType.instance));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+
+            createTable(standardCFMD(KEYSPACE, CF).compression(compressionParameters).build()),
+            createTable(standardCFMD(KEYSPACE, CF2).compression(compressionParameters).build()),
+            createTable(standardCFMD(KEYSPACE, CF3).build()),
+            createTable(standardCFMD(KEYSPACE, CF4).build()),
+            createTable(standardCFMD(KEYSPACE, CORRUPT_CF).build()),
+            createTable(standardCFMD(KEYSPACE, CORRUPT_CF2).build()),
+            createTable(counterCFMD(KEYSPACE, COUNTER_CF).compression(compressionParameters).build()),
+            createTable(counterCFMD(KEYSPACE, COUNTER_CF2).compression(compressionParameters).build()),
+            createTable(counterCFMD(KEYSPACE, COUNTER_CF3).build()),
+            createTable(counterCFMD(KEYSPACE, COUNTER_CF4).build()),
+            createTable(counterCFMD(KEYSPACE, CORRUPTCOUNTER_CF).build()),
+            createTable(counterCFMD(KEYSPACE, CORRUPTCOUNTER_CF2).build()),
+            createTable(standardCFMD(KEYSPACE, CF_UUID, 0, UUIDType.instance).build())
+        );
     }
 
 

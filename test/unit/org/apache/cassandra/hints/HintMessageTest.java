@@ -24,19 +24,21 @@ import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
 
 import static junit.framework.Assert.assertEquals;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.hints.HintsTestUtil.assertHintsEqual;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
 
 public class HintMessageTest
@@ -48,12 +50,16 @@ public class HintMessageTest
     public void testSerializer() throws IOException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1), SchemaLoader.standardCFMD(KEYSPACE, TABLE));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, TABLE).build())
+        );
 
         UUID hostId = UUID.randomUUID();
         long now = FBUtilities.timestampMicros();
 
-        TableMetadata table = Schema.instance.getTableMetadata(KEYSPACE, TABLE);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(KEYSPACE, TABLE);
         Mutation mutation =
             new RowUpdateBuilder(table, now, bytes("key"))
                 .clustering("column")

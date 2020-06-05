@@ -43,7 +43,6 @@ import org.apache.cassandra.cql3.functions.types.UserType;
 import org.apache.cassandra.cql3.statements.ModificationStatement;
 import org.apache.cassandra.cql3.statements.UpdateStatement;
 import org.apache.cassandra.db.Clustering;
-import org.apache.cassandra.db.SystemKeyspace;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.exceptions.InvalidRequestException;
@@ -304,7 +303,7 @@ public class CQLSSTableWriter implements Closeable
      */
     public UserType getUDType(String dataType)
     {
-        KeyspaceMetadata ksm = Schema.instance.getKeyspaceMetadata(insert.keyspace());
+        KeyspaceMetadata ksm = SchemaManager.instance.getKeyspaceMetadata(insert.keyspace());
         org.apache.cassandra.db.marshal.UserType userType = ksm.types.getNullable(ByteBufferUtil.bytes(dataType));
         return (UserType) UDHelper.driverType(userType);
     }
@@ -502,32 +501,24 @@ public class CQLSSTableWriter implements Closeable
 
             synchronized (CQLSSTableWriter.class)
             {
-                if (Schema.instance.getKeyspaceMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME) == null)
-                    Schema.instance.load(SchemaKeyspace.metadata());
-                if (Schema.instance.getKeyspaceMetadata(SchemaConstants.SYSTEM_KEYSPACE_NAME) == null)
-                    Schema.instance.load(SystemKeyspace.metadata());
+                SchemaManager.instance.localKeyspaces().loadHardCodedDefinitions();
 
                 String keyspaceName = schemaStatement.keyspace();
 
-                if (Schema.instance.getKeyspaceMetadata(keyspaceName) == null)
-                {
-                    Schema.instance.load(KeyspaceMetadata.create(keyspaceName,
-                                                                 KeyspaceParams.simple(1),
-                                                                 Tables.none(),
-                                                                 Views.none(),
-                                                                 Types.none(),
-                                                                 Functions.none()));
-                }
+                // Create keyspace, types and tables if necessary (all of which might be already created if multiple
+                // instances of CQLSSTableWriter are running in the same JVM, courtesy of static singletons).
+                // TODO: note that if any of those do exists, we're implicitly assuming here that their schema will be
+                //  compatible with what is passed to this CQLSStableWriter instance. We could try to validate it
+                //  though to prevent hard-to-find user (admittedly unlikely) mistakes.
+                KeyspaceMetadata ksToCreate = KeyspaceMetadata.create(keyspaceName, KeyspaceParams.simple(1));
+                SchemaManager.instance.apply(SchemaTransformations.createKeyspaceIfNotExists(ksToCreate));
 
-                KeyspaceMetadata ksm = Schema.instance.getKeyspaceMetadata(keyspaceName);
+                Types typesToCreate = createTypes(keyspaceName);
+                SchemaManager.instance.apply(SchemaTransformations.createTypesIfNotExists(typesToCreate));
 
-                TableMetadata tableMetadata = ksm.tables.getNullable(schemaStatement.table());
-                if (tableMetadata == null)
-                {
-                    Types types = createTypes(keyspaceName);
-                    tableMetadata = createTable(types);
-                    Schema.instance.load(ksm.withSwapped(ksm.tables.with(tableMetadata)).withSwapped(types));
-                }
+                TableMetadata tableMetadata = createTable(typesToCreate);
+                SchemaManager.instance.apply(SchemaTransformations.createTableIfNotExists(tableMetadata));
+
 
                 UpdateStatement preparedInsert = prepareInsert();
 

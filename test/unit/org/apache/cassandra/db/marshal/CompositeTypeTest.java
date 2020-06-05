@@ -24,6 +24,10 @@ import java.util.*;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertEquals;
 
@@ -36,7 +40,6 @@ import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.partitions.ImmutableBTreePartition;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.SyntaxException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.serializers.MarshalException;
 import org.apache.cassandra.utils.*;
 
@@ -67,9 +70,11 @@ public class CompositeTypeTest
     {
         AbstractType<?> composite = CompositeType.getInstance(Arrays.asList(new AbstractType<?>[]{BytesType.instance, TimeUUIDType.instance, IntegerType.instance}));
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.denseCFMD(KEYSPACE1, CF_STANDARDCOMPOSITE, composite));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.denseCFMD(KEYSPACE1, CF_STANDARDCOMPOSITE, composite).build())
+        );
     }
 
     @Test

@@ -28,6 +28,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
@@ -36,14 +37,15 @@ import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.lifecycle.SSTableSet;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.Pair;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.db.compaction.DateTieredCompactionStrategy.getBuckets;
 import static org.apache.cassandra.db.compaction.DateTieredCompactionStrategy.newestBucket;
 import static org.apache.cassandra.db.compaction.DateTieredCompactionStrategy.filterOldSSTables;
 import static org.apache.cassandra.db.compaction.DateTieredCompactionStrategy.validateOptions;
 
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 public class DateTieredCompactionStrategyTest extends SchemaLoader
@@ -58,9 +60,10 @@ public class DateTieredCompactionStrategyTest extends SchemaLoader
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                KeyspaceParams.simple(1),
-                SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1));
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build())
+        );
     }
 
     @Test

@@ -34,13 +34,15 @@ import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.metrics.RestorableMeter;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.Pair;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy.getBuckets;
 import static org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy.mostInterestingBucket;
 import static org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy.trimToThresholdWithHotness;
 import static org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy.validateOptions;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -58,9 +60,10 @@ public class SizeTieredCompactionStrategyTest
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build())
+        );
     }
 
     @Test

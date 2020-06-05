@@ -42,7 +42,6 @@ import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.service.reads.SpeculativeRetryPolicy;
 import org.apache.cassandra.schema.ColumnMetadata.ClusteringOrder;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
 import org.apache.cassandra.service.reads.repair.ReadRepairStrategy;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
@@ -274,8 +273,15 @@ public final class SchemaKeyspace
         return KeyspaceMetadata.create(SchemaConstants.SCHEMA_KEYSPACE_NAME, KeyspaceParams.local(), org.apache.cassandra.schema.Tables.of(ALL_TABLE_METADATA));
     }
 
-    static Collection<Mutation> convertSchemaDiffToMutations(KeyspacesDiff diff, long timestamp)
+    static Collection<Mutation> convertSchemaDiffToMutations(KeyspacesDiff diff, Optional<Long> generation)
     {
+        // If a generation number has been passed as a parameter, we know we want to preserve the
+        // existing user settings at the keyspace level and update the tables definitions based on the
+        // generation number. Therefore, if a generation number is present, always use generation 0
+        // for the keyspace definition itself (name, replication, durability) this ensures that any changes
+        // made to replication by the user will never be overwritten.
+        long timestamp = generation.isPresent() ? 0 : systemClockMicros();
+
         Map<String, Mutation> mutations = new HashMap<>();
 
         diff.created.forEach(k -> mutations.put(k.name, makeCreateKeyspaceMutation(k, timestamp).build()));
@@ -285,6 +291,10 @@ public final class SchemaKeyspace
             KeyspaceMetadata ks = kd.after;
 
             Mutation.SimpleBuilder builder = makeCreateKeyspaceMutation(ks.name, ks.params, timestamp);
+
+            // Now, if the generation is present, set the timestamp to generation, so the tables have the expected timestamp
+            // Otherwise that will be left to the current system timestamp.
+            generation.ifPresent(builder::timestamp);
 
             kd.types.created.forEach(t -> addTypeToSchemaMutation(t, builder));
             kd.types.dropped.forEach(t -> addDropTypeToSchemaMutation(t, builder));
@@ -312,13 +322,18 @@ public final class SchemaKeyspace
         return mutations.values();
     }
 
+    private static long systemClockMicros()
+    {
+        return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
+    }
+
     /**
      * Add entries to system_schema.* for the hardcoded system keyspaces
      */
     public static void saveSystemKeyspacesSchema()
     {
-        KeyspaceMetadata system = Schema.instance.getKeyspaceMetadata(SchemaConstants.SYSTEM_KEYSPACE_NAME);
-        KeyspaceMetadata schema = Schema.instance.getKeyspaceMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME);
+        KeyspaceMetadata system = SchemaManager.instance.getKeyspaceMetadata(SchemaConstants.SYSTEM_KEYSPACE_NAME);
+        KeyspaceMetadata schema = SchemaManager.instance.getKeyspaceMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME);
 
         long timestamp = FBUtilities.timestampMicros();
 
@@ -1188,7 +1203,7 @@ public final class SchemaKeyspace
          * TODO: find a way to get rid of Schema.instance dependency; evaluate if the opimisation below makes a difference
          * in the first place. Remove if it isn't.
          */
-        org.apache.cassandra.cql3.functions.Function existing = Schema.instance.findFunction(name, argTypes).orElse(null);
+        org.apache.cassandra.cql3.functions.Function existing = SchemaManager.instance.findFunction(name, argTypes).orElse(null);
         if (existing instanceof UDFunction)
         {
             // This check prevents duplicate compilation of effectively the same UDF.

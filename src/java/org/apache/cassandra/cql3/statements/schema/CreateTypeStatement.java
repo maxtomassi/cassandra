@@ -30,7 +30,7 @@ import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.UserType;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.Keyspaces;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.schema.Types;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
@@ -96,7 +96,7 @@ public final class CreateTypeStatement extends AlterSchemaStatement
                          .collect(toList());
 
         UserType udt = new UserType(keyspaceName, bytes(typeName), fieldNames, fieldTypes, true);
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.types.with(udt)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.types.with(udt)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

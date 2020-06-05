@@ -38,7 +38,7 @@ import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.Verb;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.BufferDecoratedKey;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.EmptyIterators;
@@ -49,16 +49,16 @@ import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.repair.messages.ValidationResponse;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.streaming.PreviewKind;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.MerkleTree;
 import org.apache.cassandra.utils.MerkleTrees;
-import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -78,10 +78,13 @@ public class ValidatorTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(keyspace,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(keyspace, columnFamily));
-        partitioner = Schema.instance.getTableMetadata(keyspace, columnFamily).partitioner;
+
+        doSchemaChanges(
+            createKeyspace(keyspace),
+            createTable(SchemaLoader.standardCFMD(keyspace, columnFamily).build())
+        );
+
+        partitioner = SchemaManager.instance.getTableMetadata(keyspace, columnFamily).partitioner;
         testSizeMegabytes = DatabaseDescriptor.getRepairSessionSpaceInMegabytes();
     }
 

@@ -32,15 +32,14 @@ import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.locator.Replica;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.TableMetadataRef;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.partitions.*;
 import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.streaming.StreamEvent;
 import org.apache.cassandra.streaming.StreamEventHandler;
@@ -49,6 +48,9 @@ import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.OutputHandler;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -65,15 +67,16 @@ public class SSTableLoaderTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2));
 
-        SchemaLoader.createKeyspace(KEYSPACE2,
-                KeyspaceParams.simple(1),
-                SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD1),
-                SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD2));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2).build()),
+
+            createKeyspace(KEYSPACE2),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD1).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD2).build())
+        );
 
         StorageService.instance.initServer();
     }
@@ -114,7 +117,7 @@ public class SSTableLoaderTest
 
         public TableMetadataRef getTableMetadata(String tableName)
         {
-            return Schema.instance.getTableMetadataRef(keyspace, tableName);
+            return SchemaManager.instance.getTableMetadataRef(keyspace, tableName);
         }
     }
 
@@ -123,7 +126,7 @@ public class SSTableLoaderTest
     {
         File dataDir = new File(tmpdir.getAbsolutePath() + File.separator + KEYSPACE1 + File.separator + CF_STANDARD1);
         assert dataDir.mkdirs();
-        TableMetadata metadata = Schema.instance.getTableMetadata(KEYSPACE1, CF_STANDARD1);
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(KEYSPACE1, CF_STANDARD1);
 
         String schema = "CREATE TABLE %s.%s (key ascii, name ascii, val ascii, val1 ascii, PRIMARY KEY (key, name))";
         String query = "INSERT INTO %s.%s (key, name, val) VALUES (?, ?, ?)";
@@ -218,7 +221,7 @@ public class SSTableLoaderTest
     {
         File dataDir = new File(tmpdir.getAbsolutePath() + File.separator + KEYSPACE1 + File.separator + CF_STANDARD1);
         assert dataDir.mkdirs();
-        TableMetadata metadata = Schema.instance.getTableMetadata(KEYSPACE1, CF_STANDARD1);
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(KEYSPACE1, CF_STANDARD1);
 
         String schema = "CREATE TABLE %s.%s (key ascii, name ascii, val ascii, val1 ascii, PRIMARY KEY (key, name))";
         String query = "INSERT INTO %s.%s (key, name, val) VALUES (?, ?, ?)";

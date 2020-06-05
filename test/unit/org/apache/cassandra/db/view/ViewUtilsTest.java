@@ -26,10 +26,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.junit.Assert;
+
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.db.commitlog.CommitLog;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.locator.Replica;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.OrderPreservingPartitioner.StringToken;
 import org.apache.cassandra.exceptions.ConfigurationException;
@@ -37,10 +38,13 @@ import org.apache.cassandra.locator.IEndpointSnitch;
 import org.apache.cassandra.locator.NetworkTopologyStrategy;
 import org.apache.cassandra.locator.PropertyFileSnitch;
 import org.apache.cassandra.locator.TokenMetadata;
-import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.ReplicationParams;
 import org.apache.cassandra.service.StorageService;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.dropKeyspaceIfExists;
 
 public class ViewUtilsTest
 {
@@ -48,6 +52,7 @@ public class ViewUtilsTest
     public static void setUp() throws ConfigurationException
     {
         DatabaseDescriptor.daemonInitialization();
+        CommitLog.instance.start();
         IEndpointSnitch snitch = new PropertyFileSnitch();
         DatabaseDescriptor.setEndpointSnitch(snitch);
         Keyspace.setInitialized();
@@ -73,9 +78,12 @@ public class ViewUtilsTest
         replicationMap.put("DC1", "1");
         replicationMap.put("DC2", "1");
 
-        Keyspace.clear("Keyspace1");
-        KeyspaceMetadata meta = KeyspaceMetadata.create("Keyspace1", KeyspaceParams.create(false, replicationMap));
-        Schema.instance.load(meta);
+        String keyspaceName = "Keyspace1";
+
+        doSchemaChanges(
+            dropKeyspaceIfExists(keyspaceName),
+            createKeyspace(keyspaceName, KeyspaceParams.create(false, replicationMap))
+        );
 
         Optional<Replica> naturalEndpoint = ViewUtils.getViewNaturalEndpoint("Keyspace1",
                                                                              new StringToken("CA"),
@@ -106,9 +114,12 @@ public class ViewUtilsTest
         replicationMap.put("DC1", "2");
         replicationMap.put("DC2", "2");
 
-        Keyspace.clear("Keyspace1");
-        KeyspaceMetadata meta = KeyspaceMetadata.create("Keyspace1", KeyspaceParams.create(false, replicationMap));
-        Schema.instance.load(meta);
+        String keyspaceName = "Keyspace1";
+
+        doSchemaChanges(
+            dropKeyspaceIfExists(keyspaceName),
+            createKeyspace(keyspaceName, KeyspaceParams.create(false, replicationMap))
+        );
 
         Optional<Replica> naturalEndpoint = ViewUtils.getViewNaturalEndpoint("Keyspace1",
                                                                              new StringToken("CA"),
@@ -138,9 +149,12 @@ public class ViewUtilsTest
         replicationMap.put("DC1", "1");
         replicationMap.put("DC2", "1");
 
-        Keyspace.clear("Keyspace1");
-        KeyspaceMetadata meta = KeyspaceMetadata.create("Keyspace1", KeyspaceParams.create(false, replicationMap));
-        Schema.instance.load(meta);
+        String keyspaceName = "Keyspace1";
+
+        doSchemaChanges(
+            dropKeyspaceIfExists(keyspaceName),
+            createKeyspace(keyspaceName, KeyspaceParams.create(false, replicationMap))
+        );
 
         Optional<Replica> naturalEndpoint = ViewUtils.getViewNaturalEndpoint("Keyspace1",
                                                                              new StringToken("AB"),

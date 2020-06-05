@@ -55,6 +55,7 @@ import org.apache.cassandra.net.AsyncStreamingInputPlus;
 import org.apache.cassandra.net.AsyncStreamingOutputPlus;
 import org.apache.cassandra.schema.CachingParams;
 import org.apache.cassandra.schema.KeyspaceParams;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.streaming.DefaultConnectionFactory;
 import org.apache.cassandra.streaming.PreviewKind;
 import org.apache.cassandra.streaming.SessionInfo;
@@ -78,6 +79,10 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 /**
  * Please ensure that this benchmark is run with stream_throughput_outbound_megabits_per_sec set to a
@@ -176,14 +181,17 @@ public class ZeroCopyStreamingBenchmark
         private Keyspace setupSchemaAndKeySpace()
         {
             SchemaLoader.prepareServer();
-            SchemaLoader.createKeyspace(KEYSPACE,
-                                        KeyspaceParams.simple(1),
-                                        SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARD),
-                                        SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEXED, true),
-                                        SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARDLOWINDEXINTERVAL)
-                                                    .minIndexInterval(8)
-                                                    .maxIndexInterval(256)
-                                                    .caching(CachingParams.CACHE_NOTHING));
+
+            doSchemaChanges(
+                createKeyspace(KEYSPACE),
+                createTable(SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARD).build()),
+                createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEXED, true).build()),
+                createTable(SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARDLOWINDEXINTERVAL)
+                                        .minIndexInterval(8)
+                                        .maxIndexInterval(256)
+                                        .caching(CachingParams.CACHE_NOTHING)
+                                        .build())
+            );
 
             return Keyspace.open(KEYSPACE);
         }

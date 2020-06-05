@@ -38,11 +38,14 @@ import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 public class HintWriteTTLTest
 {
@@ -87,7 +90,11 @@ public class HintWriteTTLTest
         System.setProperty("cassandra.maxHintTTL", Integer.toString(TTL));
         SchemaLoader.prepareServer();
         TableMetadata tbm = CreateTableStatement.parse("CREATE TABLE tbl (k INT PRIMARY KEY, v INT)", "ks").gcGraceSeconds(GC_GRACE).build();
-        SchemaLoader.createKeyspace("ks", KeyspaceParams.simple(1), tbm);
+
+        doSchemaChanges(
+            createKeyspace("ks"),
+            createTable(tbm)
+        );
 
         int nowInSeconds = FBUtilities.nowInSeconds();
         liveHint = makeHint(tbm, 1, nowInSeconds, GC_GRACE);

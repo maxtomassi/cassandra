@@ -19,7 +19,6 @@ package org.apache.cassandra.db;
 
 import java.util.Collection;
 
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -28,6 +27,9 @@ import org.apache.cassandra.Util;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 
 public class ColumnFamilyMetricTest
@@ -36,9 +38,11 @@ public class ColumnFamilyMetricTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace("Keyspace1",
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD("Keyspace1", "Standard2"));
+
+        doSchemaChanges(
+            createKeyspace("Keyspace1"),
+            createTable(SchemaLoader.standardCFMD("Keyspace1", "Standard2").build())
+        );
     }
 
     @Test

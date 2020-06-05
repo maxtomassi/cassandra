@@ -27,7 +27,7 @@ import org.apache.cassandra.cql3.UTName;
 import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.db.marshal.UserType;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.schema.Keyspaces;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
@@ -110,7 +110,7 @@ public final class DropTypeStatement extends AlterSchemaStatement
                       join(", ", transform(tables, t -> t.name)));
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.types.without(type)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.types.without(type)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

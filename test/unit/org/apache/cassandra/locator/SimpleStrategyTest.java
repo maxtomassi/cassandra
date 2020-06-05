@@ -39,7 +39,7 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.OrderPreservingPartitioner;
@@ -47,11 +47,12 @@ import org.apache.cassandra.dht.OrderPreservingPartitioner.StringToken;
 import org.apache.cassandra.dht.RandomPartitioner.BigIntegerToken;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.schema.KeyspaceMetadata;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.PendingRangeCalculatorService;
 import org.apache.cassandra.service.StorageServiceAccessor;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -65,8 +66,12 @@ public class SimpleStrategyTest
     public static void defineSchema()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1));
-        SchemaLoader.createKeyspace(MULTIDC, KeyspaceParams.simple(3));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createKeyspace(MULTIDC, 3)
+        );
+
         DatabaseDescriptor.setTransientReplicationEnabledUnsafe(true);
     }
 
@@ -155,7 +160,7 @@ public class SimpleStrategyTest
     {
         TokenMetadata tmd;
         AbstractReplicationStrategy strategy;
-        for (String keyspaceName : Schema.instance.getNonLocalStrategyKeyspaces())
+        for (String keyspaceName : SchemaManager.instance.getNonLocalStrategyKeyspaces())
         {
             tmd = new TokenMetadata();
             strategy = getStrategy(keyspaceName, tmd, new SimpleSnitch());
@@ -210,7 +215,7 @@ public class SimpleStrategyTest
         tmd.addBootstrapToken(bsToken, bootstrapEndpoint);
 
         AbstractReplicationStrategy strategy = null;
-        for (String keyspaceName : Schema.instance.getNonLocalStrategyKeyspaces())
+        for (String keyspaceName : SchemaManager.instance.getNonLocalStrategyKeyspaces())
         {
             strategy = getStrategy(keyspaceName, tmd, new SimpleSnitch());
 
@@ -321,7 +326,7 @@ public class SimpleStrategyTest
 
     private AbstractReplicationStrategy getStrategy(String keyspaceName, TokenMetadata tmd, IEndpointSnitch snitch)
     {
-        KeyspaceMetadata ksmd = Schema.instance.getKeyspaceMetadata(keyspaceName);
+        KeyspaceMetadata ksmd = SchemaManager.instance.getKeyspaceMetadata(keyspaceName);
         return AbstractReplicationStrategy.createReplicationStrategy(
                                                                     keyspaceName,
                                                                     ksmd.params.replication.klass,

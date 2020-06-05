@@ -40,11 +40,13 @@ import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.schema.Indexes;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -75,7 +77,10 @@ public class CacheProviderTest
                          .addRegularColumn("col1", AsciiType.instance)
                          .build();
 
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1), cfm);
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(cfm)
+        );
     }
 
     private CachedBTreePartition createPartition()

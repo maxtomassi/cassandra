@@ -28,8 +28,10 @@ import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.db.Slices;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ClientState;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 
 public class SelectStatementTest
 {
@@ -41,7 +43,7 @@ public class SelectStatementTest
     {
         DatabaseDescriptor.daemonInitialization();
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1));
+        doSchemaChanges(createKeyspace(KEYSPACE));
     }
 
     private static SelectStatement parseSelect(String query)

@@ -20,11 +20,11 @@ package org.apache.cassandra.db;
 import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.dht.Bounds;
 import org.apache.cassandra.dht.Token;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -33,10 +33,12 @@ import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.db.marshal.*;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.service.CacheService;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
@@ -52,14 +54,18 @@ public class CounterCacheTest
     {
         SchemaLoader.prepareServer();
 
-        TableMetadata.Builder counterTable =
+        TableMetadata counterTable =
             TableMetadata.builder(KEYSPACE1, COUNTER1)
                          .isCounter(true)
                          .addPartitionKeyColumn("key", Int32Type.instance)
                          .addClusteringColumn("name", Int32Type.instance)
-                         .addRegularColumn("c", CounterColumnType.instance);
+                         .addRegularColumn("c", CounterColumnType.instance)
+                         .build();
 
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1), counterTable);
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(counterTable)
+        );
     }
 
     @AfterClass
@@ -191,7 +197,7 @@ public class CounterCacheTest
         CacheService.instance.invalidateCounterCache();
         assertEquals(0, CacheService.instance.counterCache.size());
 
-        Keyspace ks = Schema.instance.removeKeyspaceInstance(KEYSPACE1);
+        Keyspace ks = SchemaManager.instance.removeKeyspaceInstance(KEYSPACE1);
 
         try
         {
@@ -201,7 +207,7 @@ public class CounterCacheTest
         }
         finally
         {
-            Schema.instance.storeKeyspaceInstance(ks);
+            SchemaManager.instance.storeKeyspaceInstance(ks);
         }
     }
 

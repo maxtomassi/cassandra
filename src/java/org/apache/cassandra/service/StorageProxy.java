@@ -18,7 +18,6 @@
 package org.apache.cassandra.service;
 
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -128,7 +127,7 @@ import org.apache.cassandra.net.MessageFlag;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.RequestCallback;
 import org.apache.cassandra.net.Verb;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.paxos.Commit;
@@ -292,7 +291,7 @@ public class StorageProxy implements StorageProxyMBean
     throws UnavailableException, IsBootstrappingException, RequestFailureException, RequestTimeoutException, InvalidRequestException, CasWriteUnknownResultException
     {
         final long startTimeForMetrics = System.nanoTime();
-        TableMetadata metadata = Schema.instance.getTableMetadata(keyspaceName, cfName);
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(keyspaceName, cfName);
         int contentions = 0;
         try
         {
@@ -2257,7 +2256,7 @@ public class StorageProxy implements StorageProxyMBean
      */
     public static Map<String, List<String>> describeSchemaVersions(boolean withPort)
     {
-        final String myVersion = Schema.instance.getVersion().toString();
+        final String myVersion = SchemaManager.instance.getVersionAsUUID().toString();
         final Map<InetAddressAndPort, UUID> versions = new ConcurrentHashMap<>();
         final Set<InetAddressAndPort> liveHosts = Gossiper.instance.getLiveMembers();
         final CountDownLatch latch = new CountDownLatch(liveHosts.size());
@@ -2761,7 +2760,7 @@ public class StorageProxy implements StorageProxyMBean
 
     public int getNumberOfTables()
     {
-        return Schema.instance.getNumberOfTables();
+        return SchemaManager.instance.getNumberOfTables();
     }
 
     public String getIdealConsistencyLevel()

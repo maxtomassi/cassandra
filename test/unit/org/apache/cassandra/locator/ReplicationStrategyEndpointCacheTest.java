@@ -30,7 +30,9 @@ import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.RandomPartitioner.BigIntegerToken;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 
 public class ReplicationStrategyEndpointCacheTest
 {
@@ -43,7 +45,7 @@ public class ReplicationStrategyEndpointCacheTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(5));
+        doSchemaChanges(createKeyspace(KEYSPACE, 5));
     }
 
     public void setup(Class stratClass, Map<String, String> strategyOptions) throws Exception

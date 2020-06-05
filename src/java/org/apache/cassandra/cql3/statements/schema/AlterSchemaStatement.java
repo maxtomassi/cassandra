@@ -28,14 +28,14 @@ import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.ClientWarn;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.messages.ResultMessage;
 
-abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformation
+abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformation, KeyspaceStatement
 {
     protected final String keyspaceName; // name of the keyspace affected by the statement
 
@@ -44,16 +44,48 @@ abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformatio
         this.keyspaceName = keyspaceName;
     }
 
+    /**
+     * Helper method that retrieves the metadata of the keyspace for this statement and directly throws if it doesn't
+     * exist. This thus never return {@code null}.
+     */
+    protected KeyspaceMetadata getExistingKeyspaceMetadata(Keyspaces schema)
+    {
+        return getKeyspaceMetadata(schema, true);
+    }
+
+    /**
+     * Helper method that retrieves the metadata of the keyspace for this statement, and optionally throws if it doesn't
+     * exist and asked to do so. If {@code throwIfNotExists} is {@code true}, this will never return {@code null}, but
+     * can otherwise.
+     */
+    protected KeyspaceMetadata getKeyspaceMetadata(Keyspaces schema, boolean throwIfNotExists)
+    {
+        KeyspaceMetadata metadata = schema.getNullable(keyspaceName);
+        if (metadata == null && throwIfNotExists)
+            throw ire("Keyspace '%s' doesn't exist", keyspaceName);
+
+        return metadata;
+    }
+
+    @Override
+    public String keyspace()
+    {
+        return keyspaceName;
+    }
+
+    @Override
     public final void validate(ClientState state)
     {
         // no-op; validation is performed while executing the statement, in apply()
     }
 
+    @Override
     public ResultMessage execute(QueryState state, QueryOptions options, long queryStartNanoTime)
     {
         return execute(state, false);
     }
 
+    @Override
     public ResultMessage executeLocally(QueryState state, QueryOptions options)
     {
         return execute(state, true);
@@ -93,13 +125,14 @@ abstract class AlterSchemaStatement implements CQLStatement, SchemaTransformatio
         if (SchemaConstants.isLocalSystemKeyspace(keyspaceName))
             throw ire("System keyspace '%s' is not user-modifiable", keyspaceName);
 
-        KeyspaceMetadata keyspace = Schema.instance.getKeyspaceMetadata(keyspaceName);
+        KeyspaceMetadata keyspace = SchemaManager.instance.getKeyspaceMetadata(keyspaceName);
         if (null != keyspace && keyspace.isVirtual())
             throw ire("Virtual keyspace '%s' is not user-modifiable", keyspaceName);
 
         validateKeyspaceName();
 
-        KeyspacesDiff diff = MigrationManager.announce(this, locally);
+        Result result = SchemaManager.instance.apply(this);
+        KeyspacesDiff diff = result.diff();
 
         clientWarnings(diff).forEach(ClientWarn.instance::warn);
 

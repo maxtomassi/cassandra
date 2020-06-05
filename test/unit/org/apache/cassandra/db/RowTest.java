@@ -28,8 +28,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.ColumnIdentifier;
@@ -39,10 +41,10 @@ import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.db.marshal.BytesType;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -61,16 +63,20 @@ public class RowTest
     {
         DatabaseDescriptor.daemonInitialization();
 
-        TableMetadata.Builder metadata =
+        TableMetadata metadata =
             TableMetadata.builder(KEYSPACE1, CF_STANDARD1)
                          .addPartitionKeyColumn("key", BytesType.instance)
                          .addClusteringColumn("col1", AsciiType.instance)
                          .addRegularColumn("a", AsciiType.instance)
-                         .addRegularColumn("b", AsciiType.instance);
+                         .addRegularColumn("b", AsciiType.instance)
+                         .build();
 
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1, KeyspaceParams.simple(1), metadata);
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KEYSPACE1),
+            SchemaTransformations.createTable(metadata)
+        );
     }
 
     @Before

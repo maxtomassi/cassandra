@@ -20,12 +20,14 @@
  */
 package org.apache.cassandra.db;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -41,14 +43,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
-import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.cql3.statements.SelectStatement;
 import org.apache.cassandra.db.filter.AbstractClusteringIndexFilter;
 import org.apache.cassandra.db.filter.ClusteringIndexNamesFilter;
@@ -71,7 +72,6 @@ import org.apache.cassandra.io.util.DataInputBuffer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.net.MessagingService;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
@@ -112,7 +112,13 @@ public class SinglePartitionSliceCommandTest
                                   .build();
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE, KeyspaceParams.simple(1), metadata, CFM_SLICES);
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(metadata),
+            createTable(CFM_SLICES)
+        );
+
         v = metadata.getColumn(new ColumnIdentifier("v", true));
         s = metadata.getColumn(new ColumnIdentifier("s", true));
     }
@@ -301,7 +307,7 @@ public class SinglePartitionSliceCommandTest
         }
 
         // check (de)serialized iterator for sstable static cell
-        Schema.instance.getColumnFamilyStoreInstance(metadata.id).forceBlockingFlush();
+        SchemaManager.instance.getColumnFamilyStoreInstance(metadata.id).forceBlockingFlush();
         try (ReadExecutionController executionController = cmd.executionController(); UnfilteredPartitionIterator pi = cmd.executeLocally(executionController))
         {
             response = ReadResponse.createDataResponse(pi, cmd);
@@ -385,8 +391,8 @@ public class SinglePartitionSliceCommandTest
     public void sstableFiltering()
     {
         QueryProcessor.executeOnceInternal("CREATE TABLE ks.legacy_mc_inaccurate_min_max (k int, c1 int, c2 int, c3 int, v int, primary key (k, c1, c2, c3))");
-        TableMetadata metadata = Schema.instance.getTableMetadata("ks", "legacy_mc_inaccurate_min_max");
-        ColumnFamilyStore cfs = Schema.instance.getColumnFamilyStoreInstance(metadata.id);
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata("ks", "legacy_mc_inaccurate_min_max");
+        ColumnFamilyStore cfs = SchemaManager.instance.getColumnFamilyStoreInstance(metadata.id);
 
         QueryProcessor.executeOnceInternal("INSERT INTO ks.legacy_mc_inaccurate_min_max (k, c1, c2, c3, v) VALUES (100, 2, 2, 2, 2)");
         QueryProcessor.executeOnceInternal("DELETE FROM ks.legacy_mc_inaccurate_min_max WHERE k=100 AND c1=1");

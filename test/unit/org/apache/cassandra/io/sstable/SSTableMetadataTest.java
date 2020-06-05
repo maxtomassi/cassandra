@@ -35,10 +35,11 @@ import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.db.marshal.IntegerType;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
-import static org.apache.cassandra.Util.getBytes;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -55,17 +56,20 @@ public class SSTableMetadataTest
     public static void defineSchema() throws Exception
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD3),
-                                    TableMetadata.builder(KEYSPACE1, CF_STANDARDCOMPOSITE2)
-                                                 .addPartitionKeyColumn("key", AsciiType.instance)
-                                                 .addClusteringColumn("name", AsciiType.instance)
-                                                 .addClusteringColumn("int", IntegerType.instance)
-                                                 .addRegularColumn("val", AsciiType.instance),
-                                    SchemaLoader.counterCFMD(KEYSPACE1, CF_COUNTER1));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD2).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD3).build()),
+            createTable(TableMetadata.builder(KEYSPACE1, CF_STANDARDCOMPOSITE2)
+                                     .addPartitionKeyColumn("key", AsciiType.instance)
+                                     .addClusteringColumn("name", AsciiType.instance)
+                                     .addClusteringColumn("int", IntegerType.instance)
+                                     .addRegularColumn("val", AsciiType.instance)
+                                     .build()),
+            createTable(SchemaLoader.counterCFMD(KEYSPACE1, CF_COUNTER1).build())
+        );
     }
 
     @Test

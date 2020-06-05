@@ -58,15 +58,16 @@ import org.apache.cassandra.io.sstable.format.SSTableWriter;
 import org.apache.cassandra.io.sstable.format.big.BigTableWriter;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 import static org.apache.cassandra.SchemaLoader.counterCFMD;
-import static org.apache.cassandra.SchemaLoader.createKeyspace;
 import static org.apache.cassandra.SchemaLoader.getCompressionParameters;
 import static org.apache.cassandra.SchemaLoader.loadSchema;
 import static org.apache.cassandra.SchemaLoader.standardCFMD;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -98,17 +99,20 @@ public class ScrubTest
     public static void defineSchema() throws ConfigurationException
     {
         loadSchema();
-        createKeyspace(KEYSPACE,
-                       KeyspaceParams.simple(1),
-                       standardCFMD(KEYSPACE, CF),
-                       standardCFMD(KEYSPACE, CF2),
-                       standardCFMD(KEYSPACE, CF3),
-                       counterCFMD(KEYSPACE, COUNTER_CF).compression(getCompressionParameters(COMPRESSION_CHUNK_LENGTH)),
-                       standardCFMD(KEYSPACE, CF_UUID, 0, UUIDType.instance),
-                       SchemaLoader.keysIndexCFMD(KEYSPACE, CF_INDEX1, true),
-                       SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEX2, true),
-                       SchemaLoader.keysIndexCFMD(KEYSPACE, CF_INDEX1_BYTEORDERED, true).partitioner(ByteOrderedPartitioner.instance),
-                       SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEX2_BYTEORDERED, true).partitioner(ByteOrderedPartitioner.instance));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+
+            createTable(standardCFMD(KEYSPACE, CF).build()),
+            createTable(standardCFMD(KEYSPACE, CF2).build()),
+            createTable(standardCFMD(KEYSPACE, CF3).build()),
+            createTable(counterCFMD(KEYSPACE, COUNTER_CF).compression(getCompressionParameters(COMPRESSION_CHUNK_LENGTH)).build()),
+            createTable(standardCFMD(KEYSPACE, CF_UUID, 0, UUIDType.instance).build()),
+            createTable(SchemaLoader.keysIndexCFMD(KEYSPACE, CF_INDEX1, true).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEX2, true).build()),
+            createTable(SchemaLoader.keysIndexCFMD(KEYSPACE, CF_INDEX1_BYTEORDERED, true).partitioner(ByteOrderedPartitioner.instance).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE, CF_INDEX2_BYTEORDERED, true).partitioner(ByteOrderedPartitioner.instance).build())
+        );
     }
 
     @Test

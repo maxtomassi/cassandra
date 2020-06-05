@@ -32,6 +32,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -43,13 +44,13 @@ import org.apache.cassandra.db.rows.EncodingStats;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.sstable.format.SSTableWriter;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class SSTableWriterTestBase extends SchemaLoader
 {
@@ -78,10 +79,12 @@ public class SSTableWriterTestBase extends SchemaLoader
         }
 
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, CF),
-                                    SchemaLoader.standardCFMD(KEYSPACE, CF_SMALL_MAX_VALUE));
+
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, CF).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, CF_SMALL_MAX_VALUE).build())
+        );
 
         maxValueSize = DatabaseDescriptor.getMaxValueSize();
         DatabaseDescriptor.setMaxValueSize(1024 * 1024); // set max value size to 1MB

@@ -71,7 +71,10 @@ import org.apache.cassandra.utils.vint.VIntCoding;
 
 import org.junit.After;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.db.commitlog.CommitLogSegment.ENTRY_OVERHEAD_SIZE;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
 
 import static org.junit.Assert.assertEquals;
@@ -123,22 +126,25 @@ public abstract class CommitLogTest
 
         SchemaLoader.prepareServer();
 
-        TableMetadata.Builder custom =
+        TableMetadata custom =
             TableMetadata.builder(KEYSPACE1, CUSTOM1)
                          .addPartitionKeyColumn("k", IntegerType.instance)
                          .addClusteringColumn("c1", MapType.getInstance(UTF8Type.instance, UTF8Type.instance, false))
                          .addClusteringColumn("c2", SetType.getInstance(UTF8Type.instance, false))
-                         .addStaticColumn("s", IntegerType.instance);
+                         .addStaticColumn("s", IntegerType.instance)
+                         .build();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1, 0, AsciiType.instance, BytesType.instance),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STANDARD2, 0, AsciiType.instance, BytesType.instance),
-                                    custom);
-        SchemaLoader.createKeyspace(KEYSPACE2,
-                                    KeyspaceParams.simpleTransient(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1, 0, AsciiType.instance, BytesType.instance),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STANDARD2, 0, AsciiType.instance, BytesType.instance));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1, 0, AsciiType.instance, BytesType.instance).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, STANDARD2, 0, AsciiType.instance, BytesType.instance).build()),
+            createTable(custom),
+
+            createKeyspace(KEYSPACE2, KeyspaceParams.simpleTransient(1)),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, STANDARD1, 0, AsciiType.instance, BytesType.instance).build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, STANDARD2, 0, AsciiType.instance, BytesType.instance).build())
+        );
+
         CompactionManager.instance.disableAutoCompaction();
 
         testKiller = new KillerForTests();

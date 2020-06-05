@@ -29,7 +29,6 @@ import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.io.sstable.ISSTableScanner;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
@@ -38,11 +37,12 @@ import org.apache.cassandra.UpdateBuilder;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.schema.CompactionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.ActiveRepairService;
-import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -58,12 +58,16 @@ public class LongLeveledCompactionStrategyTest
         Map<String, String> leveledOptions = new HashMap<>();
         leveledOptions.put("sstable_size_in_mb", "1");
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLVL)
-                                                .compaction(CompactionParams.lcs(leveledOptions)),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLVL2)
-                                                .compaction(CompactionParams.lcs(leveledOptions)));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLVL)
+                                    .compaction(CompactionParams.lcs(leveledOptions))
+                                    .build()),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARDLVL2)
+                                    .compaction(CompactionParams.lcs(leveledOptions))
+                                    .build())
+        );
     }
 
     @Test

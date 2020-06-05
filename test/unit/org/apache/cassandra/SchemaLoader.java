@@ -43,13 +43,28 @@ import org.apache.cassandra.index.sasi.SASIIndex;
 import org.apache.cassandra.index.sasi.disk.OnDiskIndexBuilder;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.MigrationManager;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
 import org.junit.After;
 import org.junit.BeforeClass;
 
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.alterTable;
+import static org.apache.cassandra.schema.SchemaTransformations.createKeyspace;
+
+/**
+ * Legacy test utility: this is still used by a number of tests but is discouraged for new tests as it is focused on
+ * creating tables with specific layouts that made sense in the legacy storage engine but are somewhat arbitrary/weird
+ * now (also, tests are more readable if the layout of the table they use is defined in the tests themselves). This
+ * also have a few methods unrelated to schema that just scream of poor organization.
+ *
+ * <p>Instead, for simple manipulation of the schema, prefer {@link SchemaTestUtils}, or use {@link CQLTester} directly
+ * if the test is a more full-featured "full-stack" test.
+ *
+ * <p>If you work on a test class that uses it, feel free to take some time to migrate it off this class if it's not
+ * much work and you feel in a cleaning mood.
+ */
 public class SchemaLoader
 {
     @BeforeClass
@@ -256,34 +271,10 @@ public class SchemaLoader
         // if you're messing with low-level sstable stuff, it can be useful to inject the schema directly
         // Schema.instance.load(schemaDefinition());
         for (KeyspaceMetadata ksm : schema)
-            MigrationManager.announceNewKeyspace(ksm, false);
+            doSchemaChanges(SchemaTransformations.createKeyspaceIfNotExists(ksm));
 
         if (Boolean.parseBoolean(System.getProperty("cassandra.test.compression", "false")))
             useCompression(schema);
-    }
-
-    public static void createKeyspace(String name, KeyspaceParams params)
-    {
-        MigrationManager.announceNewKeyspace(KeyspaceMetadata.create(name, params, Tables.of()), true);
-    }
-
-    public static void createKeyspace(String name, KeyspaceParams params, TableMetadata.Builder... builders)
-    {
-        Tables.Builder tables = Tables.builder();
-        for (TableMetadata.Builder builder : builders)
-            tables.add(builder.build());
-
-        MigrationManager.announceNewKeyspace(KeyspaceMetadata.create(name, params, tables.build()), true);
-    }
-
-    public static void createKeyspace(String name, KeyspaceParams params, TableMetadata... tables)
-    {
-        MigrationManager.announceNewKeyspace(KeyspaceMetadata.create(name, params, Tables.of(tables)), true);
-    }
-
-    public static void createKeyspace(String name, KeyspaceParams params, Tables tables, Types types)
-    {
-        MigrationManager.announceNewKeyspace(KeyspaceMetadata.create(name, params, tables, Views.none(), types, Functions.none()), true);
     }
 
     public static void setupAuth(IRoleManager roleManager, IAuthenticator authenticator, IAuthorizer authorizer, INetworkAuthorizer networkAuthorizer)
@@ -292,12 +283,12 @@ public class SchemaLoader
         DatabaseDescriptor.setAuthenticator(authenticator);
         DatabaseDescriptor.setAuthorizer(authorizer);
         DatabaseDescriptor.setNetworkAuthorizer(networkAuthorizer);
-        MigrationManager.announceNewKeyspace(AuthKeyspace.metadata(), true);
+        doSchemaChanges(createKeyspace(AuthKeyspace.metadata()));
         DatabaseDescriptor.getRoleManager().setup();
         DatabaseDescriptor.getAuthenticator().setup();
         DatabaseDescriptor.getAuthorizer().setup();
         DatabaseDescriptor.getNetworkAuthorizer().setup();
-        Schema.instance.registerListener(new AuthSchemaChangeListener());
+        SchemaManager.instance.registerListener(new AuthSchemaChangeListener());
     }
 
     public static ColumnMetadata integerColumn(String ksName, String cfName)
@@ -342,9 +333,13 @@ public class SchemaLoader
 
     private static void useCompression(List<KeyspaceMetadata> schema)
     {
+        List<SchemaTransformation> changes = new ArrayList<>();
+
         for (KeyspaceMetadata ksm : schema)
             for (TableMetadata cfm : ksm.tablesAndViews())
-                MigrationManager.announceTableUpdate(cfm.unbuild().compression(CompressionParams.snappy()).build(), true);
+                changes.add(alterTable(ksm.name, cfm.name, b -> b.compression(CompressionParams.snappy())));
+
+        doSchemaChanges(changes);
     }
 
     public static TableMetadata.Builder counterCFMD(String ksName, String cfName)
@@ -826,7 +821,7 @@ public static TableMetadata.Builder clusteringSASICFMD(String ksName, String cfN
 
     public static void insertData(String keyspace, String columnFamily, int offset, int numberOfRows)
     {
-        TableMetadata cfm = Schema.instance.getTableMetadata(keyspace, columnFamily);
+        TableMetadata cfm = SchemaManager.instance.getTableMetadata(keyspace, columnFamily);
 
         for (int i = offset; i < offset + numberOfRows; i++)
         {

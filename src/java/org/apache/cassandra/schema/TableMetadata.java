@@ -546,7 +546,7 @@ public final class TableMetadata
      *         e.g. any columns or indexes were added, removed, or altered; otherwise, false is returned.
      *         Used to determine whether prepared statements against this table need to be re-prepared.
      */
-    boolean changeAffectsPreparedStatements(TableMetadata updated)
+    public boolean changeAffectsPreparedStatements(TableMetadata updated)
     {
         return !partitionKeyColumns.equals(updated.partitionKeyColumns)
             || !clusteringColumns.equals(updated.clusteringColumns)
@@ -887,6 +887,18 @@ public final class TableMetadata
         public Builder indexes(Indexes val)
         {
             indexes = val;
+            return this;
+        }
+
+        public Builder addIndex(IndexMetadata index)
+        {
+            indexes = indexes.with(index);
+            return this;
+        }
+
+        public Builder removeIndex(String indexName)
+        {
+            indexes = indexes.without(indexName);
             return this;
         }
 

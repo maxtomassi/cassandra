@@ -23,7 +23,7 @@ import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QualifiedName;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -71,7 +71,7 @@ public final class AlterViewStatement extends AlterSchemaStatement
         }
 
         ViewMetadata newView = view.copy(view.metadata.withSwapped(params));
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.views.withSwapped(newView)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.views.withSwapped(newView)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
@@ -81,7 +81,7 @@ public final class AlterViewStatement extends AlterSchemaStatement
 
     public void authorize(ClientState client)
     {
-        ViewMetadata view = Schema.instance.getView(keyspaceName, viewName);
+        ViewMetadata view = SchemaManager.instance.getView(keyspaceName, viewName);
         if (null != view)
             client.ensureTablePermission(keyspaceName, view.baseTableName, Permission.ALTER);
     }

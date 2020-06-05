@@ -25,18 +25,22 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.SchemaTestUtils;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.partitions.*;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 /**
  * Test cases where multiple keys collides, ie have the same token.
@@ -57,9 +61,11 @@ public class KeyCollisionTest
         DatabaseDescriptor.daemonInitialization();
         oldPartitioner = StorageService.instance.setPartitionerUnsafe(LengthPartitioner.instance);
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF).build())
+        );
     }
 
     @AfterClass
@@ -95,7 +101,7 @@ public class KeyCollisionTest
 
     private void insert(String key)
     {
-        RowUpdateBuilder builder = new RowUpdateBuilder(Schema.instance.getTableMetadata(KEYSPACE1, CF), FBUtilities.timestampMicros(), key);
+        RowUpdateBuilder builder = new RowUpdateBuilder(SchemaManager.instance.getTableMetadata(KEYSPACE1, CF), FBUtilities.timestampMicros(), key);
         builder.clustering("c").add("val", "asdf").build().applyUnsafe();
     }
 

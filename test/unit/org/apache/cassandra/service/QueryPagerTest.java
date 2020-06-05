@@ -39,14 +39,16 @@ import org.apache.cassandra.db.filter.*;
 import org.apache.cassandra.db.partitions.FilteredPartition;
 import org.apache.cassandra.db.partitions.PartitionIterator;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.pager.QueryPager;
 import org.apache.cassandra.service.pager.PagingState;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.cql3.QueryProcessor.executeInternal;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
 import static org.junit.Assert.*;
 
@@ -65,24 +67,27 @@ public class QueryPagerTest
     {
         SchemaLoader.prepareServer();
 
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD).build()),
 
-        SchemaLoader.createKeyspace(KEYSPACE_CQL,
-                                    KeyspaceParams.simple(1),
-                                    CreateTableStatement.parse("CREATE TABLE " + CF_CQL + " ("
-                                                               + "k text,"
-                                                               + "c text,"
-                                                               + "v text,"
-                                                               + "PRIMARY KEY (k, c))", KEYSPACE_CQL),
-                                    CreateTableStatement.parse("CREATE TABLE " + CF_CQL_WITH_STATIC + " ("
-                                                               + "pk text, "
-                                                               + "ck int, "
-                                                               + "st int static, "
-                                                               + "v1 int, "
-                                                               + "v2 int, "
-                                                               + "PRIMARY KEY(pk, ck))", KEYSPACE_CQL));
+            createKeyspace(KEYSPACE_CQL),
+            createTable(CreateTableStatement.parse("CREATE TABLE " + CF_CQL + " ("
+                                                   + "k text,"
+                                                   + "c text,"
+                                                   + "v text,"
+                                                   + "PRIMARY KEY (k, c))", KEYSPACE_CQL)
+                                            .build()),
+            createTable(CreateTableStatement.parse("CREATE TABLE " + CF_CQL_WITH_STATIC + " ("
+                                                   + "pk text, "
+                                                   + "ck int, "
+                                                   + "st int static, "
+                                                   + "v1 int, "
+                                                   + "v2 int, "
+                                                   + "PRIMARY KEY(pk, ck))", KEYSPACE_CQL)
+                                            .build())
+        );
+
         addData();
     }
 

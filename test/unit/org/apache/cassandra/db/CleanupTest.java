@@ -56,6 +56,9 @@ import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -85,10 +88,12 @@ public class CleanupTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED1, true));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE1, CF_INDEXED1, true).build())
+        );
 
 
         DatabaseDescriptor.setEndpointSnitch(new AbstractNetworkTopologySnitch()
@@ -106,13 +111,14 @@ public class CleanupTest
             }
         });
 
-        SchemaLoader.createKeyspace(KEYSPACE2,
-                                    KeyspaceParams.nts("DC1", 1),
-                                    SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD2),
-                                    SchemaLoader.compositeIndexCFMD(KEYSPACE2, CF_INDEXED2, true));
-        SchemaLoader.createKeyspace(KEYSPACE3,
-                                    KeyspaceParams.nts("DC1", 1),
-                                    SchemaLoader.standardCFMD(KEYSPACE3, CF_STANDARD3));
+        doSchemaChanges(
+            createKeyspace(KEYSPACE2, KeyspaceParams.nts("DC1", 1)),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE2, CF_STANDARD2).build()),
+            createTable(SchemaLoader.compositeIndexCFMD(KEYSPACE2, CF_INDEXED2, true).build()),
+
+            createKeyspace(KEYSPACE3, KeyspaceParams.nts("DC1", 1)),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE3, CF_STANDARD3).build())
+        );
     }
 
     @Test

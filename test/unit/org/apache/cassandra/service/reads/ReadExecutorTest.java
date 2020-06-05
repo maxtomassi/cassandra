@@ -41,10 +41,12 @@ import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.NoPayload;
 import org.apache.cassandra.net.Verb;
-import org.apache.cassandra.schema.KeyspaceParams;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.locator.ReplicaUtils.full;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -59,7 +61,12 @@ public class ReadExecutorTest
     public static void setUpClass() throws Throwable
     {
         SchemaLoader.loadSchema();
-        SchemaLoader.createKeyspace("Foo", KeyspaceParams.simple(3), SchemaLoader.standardCFMD("Foo", "Bar"));
+
+        doSchemaChanges(
+            createKeyspace("Foo", 3),
+            createTable(SchemaLoader.standardCFMD("Foo", "Bar").build())
+        );
+
         ks = Keyspace.open("Foo");
         cfs = ks.getColumnFamilyStore("Bar");
         dummy = Murmur3Partitioner.instance.getMinimumToken();

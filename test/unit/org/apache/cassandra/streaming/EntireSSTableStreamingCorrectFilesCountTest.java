@@ -52,11 +52,13 @@ import org.apache.cassandra.net.AsyncStreamingOutputPlus;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.SharedDefaultFileRegion;
 import org.apache.cassandra.schema.CompactionParams;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FBUtilities;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.apache.cassandra.service.ActiveRepairService.NO_PENDING_REPAIR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -75,13 +77,16 @@ public class EntireSSTableStreamingCorrectFilesCountTest
     public static void defineSchemaAndPrepareSSTable()
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARD)
-                                                // LeveledCompactionStrategy is important here,
-                                                // streaming of entire SSTables works currently only with this strategy
-                                                .compaction(CompactionParams.lcs(Collections.emptyMap()))
-                                                .partitioner(ByteOrderedPartitioner.instance));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE, CF_STANDARD)
+                                    // LeveledCompactionStrategy is important here,
+                                    // streaming of entire SSTables works currently only with this strategy
+                                    .compaction(CompactionParams.lcs(Collections.emptyMap()))
+                                    .partitioner(ByteOrderedPartitioner.instance)
+                                    .build())
+        );
 
         Keyspace keyspace = Keyspace.open(KEYSPACE);
         store = keyspace.getColumnFamilyStore(CF_STANDARD);

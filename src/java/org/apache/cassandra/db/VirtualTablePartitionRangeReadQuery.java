@@ -21,8 +21,8 @@ import org.apache.cassandra.db.filter.ColumnFilter;
 import org.apache.cassandra.db.filter.DataLimits;
 import org.apache.cassandra.db.filter.RowFilter;
 import org.apache.cassandra.db.partitions.UnfilteredPartitionIterator;
-import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.db.virtual.VirtualTable;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.TableMetadata;
 
 /**
@@ -89,7 +89,7 @@ public class VirtualTablePartitionRangeReadQuery extends VirtualTableReadQuery i
     @Override
     protected UnfilteredPartitionIterator queryVirtualTable()
     {
-        VirtualTable view = VirtualKeyspaceRegistry.instance.getTableNullable(metadata().id);
+        VirtualTable view = SchemaManager.instance.localKeyspaces().virtualTableInstance(metadata());
         return view.select(dataRange, columnFilter());
     }
 

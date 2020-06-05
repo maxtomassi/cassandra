@@ -20,7 +20,6 @@ package org.apache.cassandra.schema;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -33,7 +32,6 @@ import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
-import org.apache.cassandra.cql3.statements.schema.CreateTableStatement;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.Mutation;
@@ -43,7 +41,10 @@ import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.service.reads.repair.ReadRepairStrategy;
 import org.apache.cassandra.utils.FBUtilities;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 import static org.apache.cassandra.cql3.QueryProcessor.executeOnceInternal;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -56,15 +57,17 @@ public class SchemaKeyspaceTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            SchemaTransformations.createTable(SchemaLoader.standardCFMD(KEYSPACE1, CF_STANDARD1).build())
+        );
     }
 
     @Test
     public void testConversionsInverses() throws Exception
     {
-        for (String keyspaceName : Schema.instance.getNonSystemKeyspaces())
+        for (String keyspaceName : SchemaManager.instance.getNonLocalSystemKeyspaces())
         {
             for (ColumnFamilyStore cfs : Keyspace.open(keyspaceName).getColumnFamilyStores())
             {
@@ -82,55 +85,44 @@ public class SchemaKeyspaceTest
     {
         String keyspace = "SandBox";
 
-        createTable(keyspace, "CREATE TABLE test (a text primary key, b int, c int)");
+        doSchemaChanges(
+            createKeyspace(keyspace),
+            createTable(keyspace, "CREATE TABLE test (a text primary key, b int, c int)")
+        );
 
-        TableMetadata metadata = Schema.instance.getTableMetadata(keyspace, "test");
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(keyspace, "test");
         assertTrue("extensions should be empty", metadata.params.extensions.isEmpty());
 
         ImmutableMap<String, ByteBuffer> extensions = ImmutableMap.of("From ... with Love",
                                                                       ByteBuffer.wrap(new byte[]{0, 0, 7}));
 
-        TableMetadata copy = metadata.unbuild().extensions(extensions).build();
+        doSchemaChanges(SchemaTransformations.alterTable(keyspace, "test", b -> b.extensions(extensions)));
 
-        updateTable(keyspace, metadata, copy);
-
-        metadata = Schema.instance.getTableMetadata(keyspace, "test");
+        metadata = SchemaManager.instance.getTableMetadata(keyspace, "test");
         assertEquals(extensions, metadata.params.extensions);
     }
 
     @Test
     public void testReadRepair()
     {
-        createTable("ks", "CREATE TABLE tbl (a text primary key, b int, c int) WITH read_repair='none'");
-        TableMetadata metadata = Schema.instance.getTableMetadata("ks", "tbl");
+        doSchemaChanges(
+            createKeyspace("ks"),
+            createTable("ks", "CREATE TABLE tbl (a text primary key, b int, c int) WITH read_repair='none'")
+        );
+
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata("ks", "tbl");
         Assert.assertEquals(ReadRepairStrategy.NONE, metadata.params.readRepair);
 
     }
 
-    private static void updateTable(String keyspace, TableMetadata oldTable, TableMetadata newTable)
-    {
-        KeyspaceMetadata ksm = Schema.instance.getKeyspaceInstance(keyspace).getMetadata();
-        Mutation mutation = SchemaKeyspace.makeUpdateTableMutation(ksm, oldTable, newTable, FBUtilities.timestampMicros()).build();
-        Schema.instance.merge(Collections.singleton(mutation));
-    }
-
-    private static void createTable(String keyspace, String cql)
-    {
-        TableMetadata table = CreateTableStatement.parse(cql, keyspace).build();
-
-        KeyspaceMetadata ksm = KeyspaceMetadata.create(keyspace, KeyspaceParams.simple(1), Tables.of(table));
-        Mutation mutation = SchemaKeyspace.makeCreateTableMutation(ksm, table, FBUtilities.timestampMicros()).build();
-        Schema.instance.merge(Collections.singleton(mutation));
-    }
-
     private static void checkInverses(TableMetadata metadata) throws Exception
     {
-        KeyspaceMetadata keyspace = Schema.instance.getKeyspaceMetadata(metadata.keyspace);
+        KeyspaceMetadata keyspace = SchemaManager.instance.getKeyspaceMetadata(metadata.keyspace);
 
         // Test schema conversion
         Mutation rm = SchemaKeyspace.makeCreateTableMutation(keyspace, metadata, FBUtilities.timestampMicros()).build();
-        PartitionUpdate serializedCf = rm.getPartitionUpdate(Schema.instance.getTableMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.TABLES));
-        PartitionUpdate serializedCD = rm.getPartitionUpdate(Schema.instance.getTableMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.COLUMNS));
+        PartitionUpdate serializedCf = rm.getPartitionUpdate(SchemaManager.instance.getTableMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.TABLES));
+        PartitionUpdate serializedCD = rm.getPartitionUpdate(SchemaManager.instance.getTableMetadata(SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.COLUMNS));
 
         UntypedResultSet.Row tableRow = QueryProcessor.resultify(String.format("SELECT * FROM %s.%s", SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.TABLES),
                                                                  UnfilteredRowIterators.filter(serializedCf.unfilteredIterator(), FBUtilities.nowInSeconds()))
@@ -152,9 +144,12 @@ public class SchemaKeyspaceTest
     {
         String testKS = "test_schema_no_partition";
         String testTable = "invalid_table";
-        SchemaLoader.createKeyspace(testKS,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(testKS, testTable));
+
+        doSchemaChanges(
+            createKeyspace(testKS),
+            SchemaTransformations.createTable(SchemaLoader.standardCFMD(testKS, testTable).build())
+        );
+
         // Delete partition column in the schema
         String query = String.format("DELETE FROM %s.%s WHERE keyspace_name=? and table_name=? and column_name=?", SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.COLUMNS);
         executeOnceInternal(query, testKS, testTable, "key");
@@ -166,9 +161,12 @@ public class SchemaKeyspaceTest
     {
         String testKS = "test_schema_no_Column";
         String testTable = "invalid_table";
-        SchemaLoader.createKeyspace(testKS,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(testKS, testTable));
+
+        doSchemaChanges(
+            createKeyspace(testKS),
+            SchemaTransformations.createTable(SchemaLoader.standardCFMD(testKS, testTable).build())
+        );
+
         // Delete all colmns in the schema
         String query = String.format("DELETE FROM %s.%s WHERE keyspace_name=? and table_name=?", SchemaConstants.SCHEMA_KEYSPACE_NAME, SchemaKeyspace.COLUMNS);
         executeOnceInternal(query, testKS, testTable);

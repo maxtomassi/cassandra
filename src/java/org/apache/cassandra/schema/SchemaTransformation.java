@@ -28,4 +28,34 @@ public interface SchemaTransformation
      * @return Keyspaces transformed by the statement
      */
     Keyspaces apply(Keyspaces schema);
+
+    /**
+     * The result of applying (on this node) a given schema transformation.
+     */
+    interface Result
+    {
+        /**
+         * Obtain the schema before and after the transformation this is the result of.
+         *
+         * @param side the side to return, before or after the transformation.
+         * @return the schema corresponding to {@code side}.
+         */
+        Schema schema(TransformationSide side);
+
+        /**
+         * The diff of the changes performed.
+         *
+         * @return the {@link KeyspacesDiff} corresponding to the transformation this is the result of.
+         */
+        KeyspacesDiff diff();
+
+        /**
+         * Whether the transformation this is the result of was empty, that is did nothing (typical of DDL with a
+         * condition that does not applySchemaMigration for instance).
+         */
+        default boolean isEmpty()
+        {
+            return diff().isEmpty();
+        }
+    }
 }

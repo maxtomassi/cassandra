@@ -38,9 +38,12 @@ import org.apache.cassandra.db.RowUpdateBuilder;
 import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.db.marshal.BytesType;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.jboss.byteman.contrib.bmunit.BMRule;
 import org.jboss.byteman.contrib.bmunit.BMUnitRunner;
+
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 
 /**
  * Tests the commitlog to make sure we can replay it - explicitly for the case where we update the chained markers
@@ -65,9 +68,11 @@ public class CommitLogChainedMarkersTest
         DatabaseDescriptor.setCommitLogSync(Config.CommitLogSync.periodic);
         DatabaseDescriptor.setCommitLogSyncPeriod(10000 * 1000);
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1, 0, AsciiType.instance, BytesType.instance));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1, 0, AsciiType.instance, BytesType.instance).build())
+        );
 
         CompactionManager.instance.disableAutoCompaction();
 

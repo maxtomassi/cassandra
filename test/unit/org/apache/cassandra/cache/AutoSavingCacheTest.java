@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.cache;
 
+import org.apache.cassandra.SchemaTestUtils;
+import org.apache.cassandra.schema.SchemaTransformations;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.config.DatabaseDescriptor;
@@ -30,9 +32,10 @@ import org.junit.Test;
 import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.Util;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.CacheService;
 import org.apache.cassandra.utils.ByteBufferUtil;
+
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
 
 public class AutoSavingCacheTest
 {
@@ -43,11 +46,15 @@ public class AutoSavingCacheTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    TableMetadata.builder(KEYSPACE1, CF_STANDARD1)
+
+        TableMetadata table = TableMetadata.builder(KEYSPACE1, CF_STANDARD1)
                                                  .addPartitionKeyColumn("pKey", AsciiType.instance)
-                                                 .addRegularColumn("col1", AsciiType.instance));
+                                                 .addRegularColumn("col1", AsciiType.instance)
+                                                 .build();
+        doSchemaChanges(
+            SchemaTestUtils.createKeyspace(KEYSPACE1),
+            SchemaTransformations.createTable(table)
+        );
     }
 
     @Test

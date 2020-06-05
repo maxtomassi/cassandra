@@ -30,7 +30,7 @@ import org.apache.cassandra.locator.LocalStrategy;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.KeyspaceParams.Option;
 import org.apache.cassandra.schema.Keyspaces;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -69,7 +69,7 @@ public final class CreateKeyspaceStatement extends AlterSchemaStatement
 
         keyspace.params.validate(keyspaceName);
 
-        return schema.withAddedOrUpdated(keyspace);
+        return schema.withAddedOrReplaced(keyspace);
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)

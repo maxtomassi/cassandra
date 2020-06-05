@@ -34,10 +34,12 @@ import org.apache.cassandra.db.rows.Cells;
 import org.apache.cassandra.db.context.CounterContext;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.exceptions.ConfigurationException;
-import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.serializers.AsciiSerializer;
 import org.apache.cassandra.utils.*;
 
+import static org.apache.cassandra.SchemaTestUtils.createKeyspace;
+import static org.apache.cassandra.SchemaTestUtils.doSchemaChanges;
+import static org.apache.cassandra.schema.SchemaTransformations.createTable;
 import static org.junit.Assert.*;
 import static org.apache.cassandra.db.context.CounterContext.ContextState;
 
@@ -59,10 +61,12 @@ public class CounterCellTest
     public static void defineSchema() throws ConfigurationException
     {
         SchemaLoader.prepareServer();
-        SchemaLoader.createKeyspace(KEYSPACE1,
-                                    KeyspaceParams.simple(1),
-                                    SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1),
-                                    SchemaLoader.counterCFMD(KEYSPACE1, COUNTER1));
+
+        doSchemaChanges(
+            createKeyspace(KEYSPACE1),
+            createTable(SchemaLoader.standardCFMD(KEYSPACE1, STANDARD1).build()),
+            createTable(SchemaLoader.counterCFMD(KEYSPACE1, COUNTER1).build())
+        );
     }
 
     @AfterClass

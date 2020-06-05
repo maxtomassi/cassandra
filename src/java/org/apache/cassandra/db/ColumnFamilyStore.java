@@ -262,6 +262,28 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
             switchMemtable();
     }
 
+    /**
+     * Called when the table this is the store of has been dropped to perform any necessary actions.
+     *
+     * @param keyspaceMetadata the metadata of the keyspace this is a table of _before_ the drop of that table. Note
+     * that this method is called _after_ the schema change that dropped the table is externally made visible and so in
+     * particular {@code keyspaceMetadata} will not be equal to accessing the metadata through the {@link #keyspace}
+     * field (the table itself will not be part of {@code keyspace.getMetadata()} for instance, but more importantly,
+     * types that the table depends on may have been dropped at the same time and not be present as well).
+     */
+    public void onTableDropped(KeyspaceMetadata keyspaceMetadata)
+    {
+        // make sure all the indexes are dropped, or else.
+        indexManager.markAllIndexesRemoved();
+        CompactionManager.instance.interruptCompactionFor(keyspaceMetadata.getTableOrViewNullable(name), true);
+        if (DatabaseDescriptor.isAutoSnapshot())
+        {
+            forceBlockingFlush();
+            String sName = Keyspace.getTimestampedSnapshotNameWithPrefix(name, ColumnFamilyStore.SNAPSHOT_DROP_PREFIX);
+            snapshotWithoutFlush(sName, keyspaceMetadata, null, false);
+        }
+    }
+
     void scheduleFlush()
     {
         int period = metadata().params.memtableFlushPeriodInMs;
@@ -1711,13 +1733,13 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public void snapshotWithoutFlush(String snapshotName)
     {
-        snapshotWithoutFlush(snapshotName, null, false);
+        snapshotWithoutFlush(snapshotName, keyspace.getMetadata(), null, false);
     }
 
     /**
      * @param ephemeral If this flag is set to true, the snapshot will be cleaned during next startup
      */
-    public Set<SSTableReader> snapshotWithoutFlush(String snapshotName, Predicate<SSTableReader> predicate, boolean ephemeral)
+    public Set<SSTableReader> snapshotWithoutFlush(String snapshotName, KeyspaceMetadata keyspaceMetadata, Predicate<SSTableReader> predicate, boolean ephemeral)
     {
         Set<SSTableReader> snapshottedSSTables = new HashSet<>();
         for (ColumnFamilyStore cfs : concatWithIndexes())
@@ -1738,7 +1760,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
                 writeSnapshotManifest(filesJSONArr, snapshotName);
                 if (!SchemaConstants.isLocalSystemKeyspace(metadata.keyspace) && !SchemaConstants.isReplicatedSystemKeyspace(metadata.keyspace))
-                    writeSnapshotSchema(snapshotName);
+                    writeSnapshotSchema(keyspaceMetadata, snapshotName);
             }
         }
         if (ephemeral)
@@ -1768,7 +1790,16 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         }
     }
 
-    private void writeSnapshotSchema(final String snapshotName)
+    /**
+     * Writes the schema of the table at the time it is being snapshot in the appropriate file.
+     *
+     * @param keyspaceMetadata metadata of the keyspace. We pass this instead of relying on the {@link #keyspace} field
+     *         because this can be used during drop, and such cases is called after the schema change that drops this
+     *         table has been made visible, so the metadata obtained from {@link #keyspace} might not contain everything
+     *         we need anymore.
+     * @param snapshotName the name of the snapshot to be taken
+     */
+    private void writeSnapshotSchema(KeyspaceMetadata keyspaceMetadata, final String snapshotName)
     {
         final File schemaFile = getDirectories().getSnapshotSchemaFile(snapshotName);
 
@@ -1892,7 +1923,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         {
             forceBlockingFlush();
         }
-        return snapshotWithoutFlush(snapshotName, predicate, ephemeral);
+        return snapshotWithoutFlush(snapshotName, keyspace.getMetadata(), predicate, ephemeral);
     }
 
     public boolean snapshotExists(String snapshotName)
@@ -2036,7 +2067,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
     public static Iterable<ColumnFamilyStore> all()
     {
-        List<Iterable<ColumnFamilyStore>> stores = new ArrayList<Iterable<ColumnFamilyStore>>(Schema.instance.getKeyspaces().size());
+        List<Iterable<ColumnFamilyStore>> stores = new ArrayList<Iterable<ColumnFamilyStore>>(SchemaManager.instance.getAllKeyspaces().size());
         for (Keyspace keyspace : Keyspace.all())
         {
             stores.add(keyspace.getColumnFamilyStores());
@@ -2609,7 +2640,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
      */
     public static ColumnFamilyStore getIfExists(TableId id)
     {
-        TableMetadata metadata = Schema.instance.getTableMetadata(id);
+        TableMetadata metadata = SchemaManager.instance.getTableMetadata(id);
         if (metadata == null)
             return null;
 
@@ -2635,7 +2666,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         if (keyspace == null)
             return null;
 
-        TableMetadata table = Schema.instance.getTableMetadata(ksName, cfName);
+        TableMetadata table = SchemaManager.instance.getTableMetadata(ksName, cfName);
         if (table == null)
             return null;
 

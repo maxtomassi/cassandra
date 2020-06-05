@@ -56,7 +56,7 @@ import org.apache.cassandra.locator.Replica;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.schema.IndexMetadata;
-import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.SchemaManager;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
@@ -977,7 +977,7 @@ public abstract class ReadCommand extends AbstractReadQuery
 
             boolean hasIndex = hasIndex(flags);
             int digestVersion = isDigest ? (int)in.readUnsignedVInt() : 0;
-            TableMetadata metadata = Schema.instance.getExistingTableMetadata(TableId.deserialize(in));
+            TableMetadata metadata = SchemaManager.instance.getExistingTableMetadata(TableId.deserialize(in));
             int nowInSec = in.readInt();
             ColumnFilter columnFilter = ColumnFilter.serializer.deserialize(in, version, metadata);
             RowFilter rowFilter = RowFilter.serializer.deserialize(in, version, metadata);

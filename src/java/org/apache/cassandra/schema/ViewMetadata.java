@@ -78,7 +78,7 @@ public final class ViewMetadata
 
     public TableMetadata baseTableMetadata()
     {
-        return Schema.instance.getTableMetadata(baseTableId);
+        return SchemaManager.instance.getTableMetadata(baseTableId);
     }
 
     @Override

@@ -23,7 +23,7 @@ import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QualifiedName;
 import org.apache.cassandra.schema.*;
-import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
+import org.apache.cassandra.schema.KeyspacesDiff;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.transport.Event.SchemaChange;
 import org.apache.cassandra.transport.Event.SchemaChange.Change;
@@ -73,7 +73,7 @@ public final class DropTableStatement extends AlterSchemaStatement
                       join(", ", transform(views, ViewMetadata::name)));
         }
 
-        return schema.withAddedOrUpdated(keyspace.withSwapped(keyspace.tables.without(table)));
+        return schema.withAddedOrReplaced(keyspace.withSwapped(keyspace.tables.without(table)));
     }
 
     SchemaChange schemaChangeEvent(KeyspacesDiff diff)
