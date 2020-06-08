@@ -88,6 +88,12 @@ public class OfflineSchemaUpdateHandler extends SchemaUpdateHandler<OfflineSchem
     }
 
     @Override
+    SchemaTransformation.Result applyLocally(SchemaTransformation transformation)
+    {
+        return apply(transformation);
+    }
+
+    @Override
     SchemaTransformation.Result apply(SchemaTransformation transformation, long ignoredGeneration)
     {
         return call(() -> {

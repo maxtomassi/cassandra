@@ -147,7 +147,6 @@ public class MigrationManager
         }
     }
 
-    // TODO: [max] we need this because we don't have a PullRequestScheduler in OSS
     private Future<?> submitMigrationTask(InetAddressAndPort endpoint)
     {
         /*

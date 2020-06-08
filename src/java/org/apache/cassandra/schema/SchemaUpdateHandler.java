@@ -485,6 +485,18 @@ abstract class SchemaUpdateHandler<S extends Schema>
     abstract SchemaTransformation.Result apply(SchemaTransformation transformation);
 
     /**
+     * Apply the provided transformation to the current schema, but don't propagate the schema changes
+     * to other nodes in the cluster.
+     *
+     * NB: This method should only be used for testing reason, for example if we want to purposely bring
+     *     the cluster in a schema disagreement state.
+     *
+     * @param transformation the transformation to applySchemaMigration to the current schema.
+     * @return the result of the schema transformation
+     */
+    abstract SchemaTransformation.Result applyLocally(SchemaTransformation transformation);
+
+    /**
      * See {@link SchemaManager#isOnDiskSchemaKeyspace(String)}.
      */
     abstract boolean isOnDiskSchemaKeyspace(String keyspaceName);

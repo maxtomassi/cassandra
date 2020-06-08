@@ -69,7 +69,13 @@ class DefaultSchemaUpdateHandler extends SchemaUpdateHandler<DefaultSchema>
     @Override
     SchemaTransformation.Result apply(SchemaTransformation transformation)
     {
-        return apply(transformation, Optional.empty());
+        return apply(transformation, Optional.empty(), false);
+    }
+
+    @Override
+    SchemaTransformation.Result applyLocally(SchemaTransformation transformation)
+    {
+        return apply(transformation, Optional.empty(), true);
     }
 
 
@@ -91,10 +97,10 @@ class DefaultSchemaUpdateHandler extends SchemaUpdateHandler<DefaultSchema>
     @Override
     SchemaTransformation.Result apply(SchemaTransformation transformation, long generation)
     {
-        return apply(transformation, Optional.of(generation));
+        return apply(transformation, Optional.of(generation), false);
     }
 
-    SchemaTransformation.Result apply(SchemaTransformation transformation, Optional<Long> generation)
+    SchemaTransformation.Result apply(SchemaTransformation transformation, Optional<Long> generation, boolean locally)
     {
         return call(() -> {
             // Check if the change applies and does something...
@@ -119,23 +125,31 @@ class DefaultSchemaUpdateHandler extends SchemaUpdateHandler<DefaultSchema>
                                                                                              mutations);
             updateSchema(result);
 
-            // Once we successfully applied the schema locally, we shouldn't fail the future as this would lead
-            // consumers to assume the schema application has failed. So catch unexpected exception and log, but
-            // don't rethrow.
-            try
+            if (!locally)
             {
-                migrationManager.pushMigrationToOtherNodes(result.mutations());
-                announceVersionUpdate(result.after.versionAsUUID());
-            }
-            catch (Exception e)
-            {
-                logger.error("Unexpected error announcing schema transformation {} to other nodes. This is a bug and "
-                             + "should be reported to DataStax support. The schema update has however been "
-                             + "successfully applied _locally_", transformation, e);
+                propagateSchemaChange(transformation, result);
             }
 
             return result;
         });
+    }
+
+    private void propagateSchemaChange(SchemaTransformation transformation, DefaultSchemaTransformationResult result)
+    {
+        // Once we successfully applied the schema locally, we shouldn't fail the future as this would lead
+        // consumers to assume the schema application has failed. So catch unexpected exception and log, but
+        // don't rethrow.
+        try
+        {
+            migrationManager.pushMigrationToOtherNodes(result.mutations());
+            announceVersionUpdate(result.after.versionAsUUID());
+        }
+        catch (Exception e)
+        {
+            logger.error("Unexpected error announcing schema transformation {} to other nodes. This is a bug and "
+                         + "should be reported to DataStax support. The schema update has however been "
+                         + "successfully applied _locally_", transformation, e);
+        }
     }
 
     @Override

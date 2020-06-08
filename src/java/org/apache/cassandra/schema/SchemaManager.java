@@ -607,6 +607,24 @@ public final class SchemaManager
     }
 
     /**
+     * Apply (only locally) the provided schema transformation to the current schema (if said transformation is valid).
+     *
+     * NB: This method doesn't propagate the schema changes to other nodes. For schema propagation use:
+     *     {@link #apply(SchemaTransformation)}. This method should really be called just for testing reason, for
+     *     example if we want to purposely bring the cluster to a schema disagreement state.
+     *
+     * @param transformation the transformation to applySchemaMigration to the current schema.
+     * @return a future on the completion of the update. If the application is valid and successful (the schema has
+     * been applied, _at least_ locally), the future will complete with the result of the change made. Otherwise, the
+     * future will complete exceptionally.
+     */
+    @VisibleForTesting
+    public SchemaTransformation.Result applyLocally(SchemaTransformation transformation)
+    {
+        return updateHandler.applyLocally(transformation);
+    }
+
+    /**
      * We have a set of non-local, distributed system keyspaces, e.g. system_traces, system_auth, etc.
      * (see {@link SchemaConstants#REPLICATED_SYSTEM_KEYSPACE_NAMES}), that need to be created on cluster initialisation,
      * and later evolved on major upgrades (sometimes minor too). This method applies the necessary transformation to
